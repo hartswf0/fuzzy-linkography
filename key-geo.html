@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creator Trails: Thinking with Contours</title>
+    <style>
+        :root {
+            --color-accent: #00cc88;
+            --color-bg: #050508;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--color-bg);
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        #container {
+            display: grid;
+            grid-template-columns: 280px 1fr 280px;
+            grid-template-rows: 60px 1fr 180px;
+            height: 100vh;
+            gap: 1px;
+            background: #222;
+        }
+
+        .panel {
+            background: #0a0a10;
+            padding: 15px;
+            overflow: auto;
+        }
+
+        #header {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #333;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        #trail-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        #canvas-container {
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* VU Meters for metrics */
+        .vu-container {
+            margin: 8px 0;
+        }
+
+        .vu-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .vu-meter {
+            height: 6px;
+            background: #1a1a20;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .vu-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0088ff, var(--color-accent), #ffdd88);
+            width: 0%;
+            transition: width 0.2s ease-out;
+        }
+
+        /* Sliders */
+        .slider-group {
+            margin: 20px 0;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            background: #1a1a20;
+            border-radius: 4px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--color-accent);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:active {
+            transform: scale(1.3);
+            box-shadow: 0 0 10px var(--color-accent);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 12px;
+            font-size: 12px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #aaa;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            margin: 4px 0;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn.active {
+            background: var(--color-accent);
+            color: #000;
+            border-color: var(--color-accent);
+        }
+
+        /* Invisible Data Layer */
+        #invisible-data {
+            font-size: 11px;
+            line-height: 1.8;
+            color: #777;
+        }
+
+        .data-item {
+            padding: 4px 0;
+            border-left: 2px solid transparent;
+            padding-left: 8px;
+            cursor: pointer;
+        }
+
+        .data-item:hover {
+            border-left-color: var(--color-accent);
+            color: #ccc;
+        }
+    </style>
+    <base target="_blank">
+</head>
+
+<body>
+    <div id="container">
+        <div id="header" class="panel">
+            <h1>Creator Trails: Contour Map Thinking</h1>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn active" style="width: auto;" onclick="setMode('video')">Video Editor</button>
+                <button class="btn" style="width: auto;" onclick="setMode('game')">Game Dev</button>
+                <button class="btn" style="width: auto;" onclick="setMode('stream')">Streamer</button>
+            </div>
+        </div>
+
+        <!-- Creator State Panel -->
+        <div class="panel">
+            <h3
+                style="font-size: 12px; color: #888; border-bottom: 1px solid #333; padding-bottom: 8px; margin-top: 0;">
+                Creator State</h3>
+
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span>Experience</span>
+                    <span id="exp-val">Intermediate</span>
+                </div>
+                <input type="range" id="exp" min="0" max="100" value="50" oninput="updateCreator()">
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span>Iterative Tendency</span>
+                    <span id="iter-val">High</span>
+                </div>
+                <input type="range" id="iter" min="0" max="100" value="70" oninput="updateCreator()">
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span>Time Pressure</span>
+                    <span id="pressure-val">Moderate</span>
+                </div>
+                <input type="range" id="pressure" min="0" max="100" value="60" oninput="updateCreator()">
+            </div>
+
+            <h3
+                style="font-size: 12px; color: #888; border-bottom: 1px solid #333; padding-bottom: 8px; margin-top: 30px;">
+                Invisible Data Layer</h3>
+            <div id="invisible-data">
+                <div class="data-item" onclick="focusData('undo')">↻ Undo depth: 23 actions</div>
+                <div class="data-item" onclick="focusData('flow')">⏱️ Flow state: 3 sessions (2.1 hrs avg)</div>
+                <div class="data-item" onclick="focusData('focus')">🎯 Focus zones: 3 major clusters</div>
+                <div class="data-item" onclick="focusData('branches')">💡 Unexplored branches: 7 dormant paths</div>
+                <div class="data-item" onclick="focusData('patterns')">🔁 Repetition pattern: Audio sync struggle</div>
+            </div>
+        </div>
+
+        <!-- Main Contour Visualization -->
+        <div class="panel" id="canvas-container">
+            <canvas id="trail-canvas"></canvas>
+            <div style="position: absolute; top: 15px; right: 15px; text-align: right; pointer-events: none;">
+                <div class="vu-label">Trail Energy</div>
+                <div class="vu-meter">
+                    <div class="vu-fill" id="energy-vu" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tool Configuration -->
+        <div class="panel">
+            <h3
+                style="font-size: 12px; color: #888; border-bottom: 1px solid #333; padding-bottom: 8px; margin-top: 0;">
+                Tool Awareness</h3>
+
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span>Trail Awareness</span>
+                    <span id="awareness-val">0% Amnesiac</span>
+                </div>
+                <input type="range" id="awareness" min="0" max="100" value="0" oninput="updateTool()">
+            </div>
+
+            <h3
+                style="font-size: 12px; color: #888; border-bottom: 1px solid #333; padding-bottom: 8px; margin-top: 30px;">
+                What-If Presets</h3>
+            <button class="btn active" onclick="setAwareness(0)">Amnesiac Tool</button>
+            <button class="btn" onclick="setAwareness(30)">Dumb Helper</button>
+            <button class="btn" onclick="setAwareness(60)">Context-Aware</button>
+            <button class="btn" onclick="setAwareness(100)">Trail-Native</button>
+
+            <h3
+                style="font-size: 12px; color: #888; border-bottom: 1px solid #333; padding-bottom: 8px; margin-top: 30px;">
+                Render Mode</h3>
+            <button class="btn active" onclick="setRenderMode('contour')">Contour Map</button>
+            <button class="btn" onclick="setRenderMode('density')">Energy Field</button>
+            <button class="btn" onclick="setRenderMode('topo')">Topographic</button>
+        </div>
+
+        <!-- Impact Metrics Panel -->
+        <div class="panel"
+            style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; align-items: center;">
+            <div class="vu-container">
+                <div class="vu-label">Cognitive Load</div>
+                <div class="vu-meter">
+                    <div class="vu-fill" id="load-vu"></div>
+                </div>
+            </div>
+            <div class="vu-container">
+                <div class="vu-label">Creative Flow</div>
+                <div class="vu-meter">
+                    <div class="vu-fill" id="flow-vu"></div>
+                </div>
+            </div>
+            <div class="vu-container">
+                <div class="vu-label">Tool Friction</div>
+                <div class="vu-meter">
+                    <div class="vu-fill" id="friction-vu"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let mode = 'video';
+        let awareness = 0;
+        let renderMode = 'contour';
+        let trailData = [];
+        let time = 0;
+        const canvas = document.getElementById('trail-canvas');
+        const ctx = canvas.getContext('2d');
+        const LOGICAL_W = 80, LOGICAL_H = 48;
+        let stateGrid = new Float32Array(LOGICAL_W * LOGICAL_H).fill(0);
+
+        let allTrails = {};
+
+        async function initTrail() {
+            trailData = [];
+            stateGrid.fill(0);
+
+            // Load actual trail data
+            try {
+                const [demosRes, testRes] = await Promise.all([
+                    fetch('./data/trail_demos.json'),
+                    fetch('./data/test.json')
+                ]);
+                const demos = await demosRes.json();
+                const test = await testRes.json();
+                allTrails = { ...demos, ...test };
+
+                // Get first trail that matches mode or fall back to first
+                const modeMap = { 'video': 'PaperWriting', 'game': 'OnBoarding', 'stream': 'StreamerWorkflow' };
+                const key = modeMap[mode] || Object.keys(allTrails)[0];
+                const data = allTrails[key];
+                const moves = Array.isArray(data) ? data : (data.moves || []);
+
+                const length = moves.length;
+                for (let i = 0; i < length; i++) {
+                    const t = i / Math.max(length - 1, 1);
+                    const moveText = moves[i].text || '';
+
+                    // Compute activity based on text length and position
+                    const baseActivity = Math.sin(t * Math.PI * 2) * 0.4 + 0.5;
+                    const textActivity = Math.min(moveText.length / 30, 1);
+
+                    trailData.push({
+                        time: i,
+                        text: moveText,
+                        activity: baseActivity * 0.6 + textActivity * 0.4,
+                        emotionalState: Math.sin(t * 4) * 0.3 + 0.5 + (textActivity * 0.2),
+                        decisionType: moveText.includes('check') || moveText.includes('fix') ? 'branch' : 'linear',
+                        unexplored: false,
+                        focus: textActivity > 0.5 ? 'high' : 'low'
+                    });
+                }
+
+                // Build state grid for contour rendering
+                trailData.forEach((node, i) => {
+                    const x = Math.floor((i / length) * LOGICAL_W);
+                    const y = Math.floor(node.emotionalState * LOGICAL_H * 0.7 + LOGICAL_H * 0.15);
+                    const idx = y * LOGICAL_W + x;
+                    if (idx < stateGrid.length) {
+                        stateGrid[idx] = node.activity * 2;
+                    }
+                });
+
+            } catch (e) {
+                console.error('Failed to load trail data', e);
+                // Fall back to synthetic if load fails
+                generateSyntheticTrail();
+            }
+        }
+
+        function generateSyntheticTrail() {
+            const length = 60;
+            for (let i = 0; i < length; i++) {
+                const t = i / length;
+                const baseActivity = Math.sin(t * Math.PI * 3) * 0.6 + Math.sin(t * Math.PI * 0.5) * 0.3;
+                const randomness = (Math.random() - 0.5) * 0.4;
+                const decisionType = Math.random() > 0.7 ? 'branch' : 'linear';
+
+                trailData.push({
+                    time: i,
+                    activity: Math.max(0, baseActivity + randomness),
+                    emotionalState: Math.sin(t * 5) * 0.5 + 0.5 + Math.random() * 0.2,
+                    decisionType: decisionType,
+                    unexplored: decisionType === 'branch' && Math.random() > 0.5,
+                    focus: Math.random() > 0.8 ? 'high' : 'low'
+                });
+            }
+
+            // Build state grid for contour rendering
+            trailData.forEach((node, i) => {
+                const x = Math.floor((i / 60) * LOGICAL_W);
+                const y = Math.floor(node.emotionalState * LOGICAL_H * 0.7 + LOGICAL_H * 0.15);
+                const idx = y * LOGICAL_W + x;
+                if (idx < stateGrid.length) {
+                    stateGrid[idx] = node.activity * 2;
+                }
+            });
+        }
+
+        function setMode(newMode) {
+            mode = newMode;
+            document.querySelectorAll('#header button').forEach(b => b.classList.remove('active'));
+            document.querySelector(`#header button[onclick="setMode('${mode}')"]`).classList.add('active');
+            initTrail();
+        }
+
+        function updateCreator() {
+            const exp = document.getElementById('exp').value;
+            const iter = document.getElementById('iter').value;
+            const pressure = document.getElementById('pressure').value;
+
+            document.getElementById('exp-val').textContent = exp < 30 ? 'Novice' : exp < 70 ? 'Intermediate' : 'Expert';
+            document.getElementById('iter-val').textContent = iter < 30 ? 'Low' : iter < 70 ? 'Medium' : 'High';
+            document.getElementById('pressure-val').textContent = pressure < 30 ? 'Low' : pressure < 70 ? 'Moderate' : 'High';
+
+            updateMetrics();
+        }
+
+        function updateTool() {
+            awareness = parseInt(document.getElementById('awareness').value);
+            const labels = ['0% Amnesiac', '10% Distant', '20% Vague', '30% Dumb Helper', '40% Noticing', '50% Aware', '60% Context-Aware', '70% Learning', '80% Adaptive', '90% Integrated', '100% Trail-Native'];
+            document.getElementById('awareness-val').textContent = labels[awareness / 10];
+            updateMetrics();
+        }
+
+        function setAwareness(val) {
+            document.getElementById('awareness').value = val;
+            updateTool();
+            document.querySelectorAll('.panel .btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function setRenderMode(mode) {
+            renderMode = mode;
+            document.querySelectorAll('.panel .btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function updateMetrics() {
+            const friction = awareness < 33 ? 85 : awareness < 66 ? 50 : 15;
+            const flow = Math.min(95, awareness * 0.8 + Math.random() * 15);
+            const load = Math.max(20, 95 - awareness * 0.7 + Math.random() * 10);
+
+            document.getElementById('load-vu').style.width = load + '%';
+            document.getElementById('flow-vu').style.width = flow + '%';
+            document.getElementById('friction-vu').style.width = friction + '%';
+
+            // Update energy VU
+            const energy = trailData.reduce((sum, node) => sum + node.activity, 0) / trailData.length;
+            document.getElementById('energy-vu').style.width = (energy * 100) + '%';
+        }
+
+        function focusData(type) {
+            // Highlight related contours when clicking invisible data
+            const highlightIntensity = type === 'flow' ? 1.5 : type === 'branches' ? 2.0 : 1.2;
+            stateGrid = stateGrid.map((val, i) => {
+                if (val > 0) return val * highlightIntensity;
+                return val;
+            });
+        }
+
+        function handleInteraction(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+
+            // Stimulate trail at this point
+            const gridX = Math.floor(x * LOGICAL_W);
+            const gridY = Math.floor(y * LOGICAL_H);
+            const idx = gridY * LOGICAL_W + gridX;
+            if (idx < stateGrid.length) {
+                stateGrid[idx] = Math.min(stateGrid[idx] + 0.8, 3.0);
+            }
+        }
+
+        // Render loop
+        function render() {
+            const width = canvas.offsetWidth;
+            const height = canvas.offsetHeight;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            ctx.scale(dpr, dpr);
+
+            ctx.clearRect(0, 0, width, height);
+
+            // Draw base grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x <= width; x += width / 10) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+            }
+            for (let y = 0; y <= height; y += height / 10) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+            }
+
+            // Simulate diffusion
+            const nextGrid = new Float32Array(stateGrid);
+            for (let y = 1; y < LOGICAL_H - 1; y++) {
+                for (let x = 1; x < LOGICAL_W - 1; x++) {
+                    const idx = y * LOGICAL_W + x;
+                    const sum = stateGrid[idx - 1] + stateGrid[idx + 1] + stateGrid[idx - LOGICAL_W] + stateGrid[idx + LOGICAL_W];
+                    nextGrid[idx] = (stateGrid[idx] * 0.6 + sum * 0.1) * 0.98;
+                }
+            }
+            stateGrid = nextGrid;
+
+            // Render contours based on awareness
+            if (awareness > 0) {
+                const levels = Math.floor(2 + awareness / 20);
+                const cellW = width / LOGICAL_W;
+                const cellH = height / LOGICAL_H;
+
+                for (let l = 1; l <= levels; l++) {
+                    const threshold = (l / levels) * 1.5 * (awareness / 100);
+                    const hue = 180 + (l / levels) * 120;
+                    const alpha = awareness > 80 ? 0.4 : awareness > 40 ? 0.2 : 0.1;
+                    ctx.strokeStyle = `hsla(${hue}, 80%, 65%, ${alpha})`;
+                    ctx.lineWidth = 2 - (l / levels) * 0.5;
+
+                    ctx.beginPath();
+                    for (let y = 0; y < LOGICAL_H - 1; y++) {
+                        for (let x = 0; x < LOGICAL_W - 1; x++) {
+                            const v0 = stateGrid[y * LOGICAL_W + x];
+                            const v1 = stateGrid[y * LOGICAL_W + x + 1];
+                            const v2 = stateGrid[(y + 1) * LOGICAL_W + x + 1];
+                            const v3 = stateGrid[(y + 1) * LOGICAL_W + x];
+
+                            if (v0 === 0 && v1 === 0 && v2 === 0 && v3 === 0) continue;
+
+                            const bin = (v0 > threshold ? 8 : 0) | (v1 > threshold ? 4 : 0) | (v2 > threshold ? 2 : 0) | (v3 > threshold ? 1 : 0);
+
+                            const ax = x + (threshold - v0) / (v1 - v0);
+                            const ay = y;
+                            const bx = x + 1;
+                            const by = y + (threshold - v1) / (v2 - v1);
+                            const cx = x + (threshold - v3) / (v2 - v3);
+                            const cy = y + 1;
+                            const dx = x;
+                            const dy = y + (threshold - v0) / (v3 - v0);
+
+                            const sx = v => v * cellW;
+                            const sy = v => v * cellH;
+
+                            switch (bin) {
+                                case 1: case 14: ctx.moveTo(sx(cx), sy(cy)); ctx.lineTo(sx(dx), sy(dy)); break;
+                                case 2: case 13: ctx.moveTo(sx(bx), sy(by)); ctx.lineTo(sx(cx), sy(cy)); break;
+                                case 3: case 12: ctx.moveTo(sx(bx), sy(by)); ctx.lineTo(sx(dx), sy(dy)); break;
+                                case 4: case 11: ctx.moveTo(sx(ax), sy(ay)); ctx.lineTo(sx(bx), sy(by)); break;
+                                case 5: ctx.moveTo(sx(ax), sy(ay)); ctx.lineTo(sx(dx), sy(dy)); ctx.moveTo(sx(bx), sy(by)); ctx.lineTo(sx(cx), sy(cy)); break;
+                                case 6: case 9: ctx.moveTo(sx(ax), sy(ay)); ctx.lineTo(sx(cx), sy(cy)); break;
+                                case 7: case 8: ctx.moveTo(sx(ax), sy(ay)); ctx.lineTo(sx(dx), sy(dy)); break;
+                                case 10: ctx.moveTo(sx(ax), sy(ay)); ctx.lineTo(sx(bx), sy(by)); ctx.moveTo(sx(cx), sy(cy)); ctx.lineTo(sx(dx), sy(dy)); break;
+                            }
+                        }
+                    }
+                    ctx.stroke();
+                }
+
+                // Show nodes if high awareness
+                if (awareness > 60) {
+                    trailData.forEach(node => {
+                        const x = (node.time / trailData.length) * width;
+                        const y = node.emotionalState * height * 0.7 + height * 0.15;
+                        ctx.fillStyle = node.unexplored ? 'rgba(255,0,255,0.8)' : `rgba(0, ${100 + node.activity * 155}, ${200}, 0.8)`;
+                        ctx.beginPath();
+                        ctx.arc(x, y, node.activity * 8 + 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                }
+            }
+
+            time += 0.016;
+            requestAnimationFrame(render);
+        }
+
+        // Initialize
+        window.addEventListener('resize', () => {
+            const width = canvas.offsetWidth;
+            const height = canvas.offsetHeight;
+            canvas.width = width;
+            canvas.height = height;
+        });
+        canvas.addEventListener('click', handleInteraction);
+        canvas.addEventListener('touchstart', handleInteraction);
+        initTrail();
+        updateCreator();
+        updateTool();
+        render();
+    </script>
+</body>
+
+</html>

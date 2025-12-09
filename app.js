@@ -11,7 +11,7 @@ const MOVE_TEXT_MODE = "NONE"; // or "FULL" or "INDEX"
 const SHOULD_COLORIZE_LINKS = true;
 const GRAPH_WIDTH = 1000;
 const INIT_X = 10;
-const INIT_Y = {FULL: 500, INDEX: 80, NONE: 60}[MOVE_TEXT_MODE];
+const INIT_Y = { FULL: 500, INDEX: 80, NONE: 60 }[MOVE_TEXT_MODE];
 const MOVE_LINK_BAR_HEIGHT = 40; // how tall the forelink/backlink bars over each move should be
 const MIN_LINK_STRENGTH = 0.35;
 const SEGMENT_THRESHOLD = 1000 * 60 * 30; // 30 mins -> milliseconds
@@ -37,7 +37,7 @@ function magnitude(vector) {
 function cosineSimilarity(vectorA, vectorB) {
 	const dotProd = dotProduct(vectorA, vectorB);
 	const magProd = magnitude(vectorA) * magnitude(vectorB);
-	return dotProd / magProd;
+	return (magProd === 0) ? 0 : (dotProd / magProd);
 }
 
 // Translate `num` from the scale bounded by `oldMin` and `oldMax`
@@ -45,7 +45,7 @@ function cosineSimilarity(vectorA, vectorB) {
 function scale(num, [oldMin, oldMax], [newMin, newMax]) {
 	const oldRange = oldMax - oldMin;
 	const newRange = newMax - newMin;
-	return (((num - oldMin) / oldRange) * newRange) + newMin;
+	return (oldRange === 0) ? newMin : (((num - oldMin) / oldRange) * newRange) + newMin;
 }
 
 /// stats on a computed linkograph
@@ -72,9 +72,9 @@ function computeLinkDensityIndex(graph) {
 function computeMoveWeights(graph) {
 	for (let i = 0; i < graph.moves.length; i++) {
 		const backlinkStrengths = Object.values(graph.links[i]);
-		graph.moves[i].backlinkWeight = totalLinkWeight(backlinkStrengths);
+		graph.moves[i].backlinkWeight = totalLinkWeight(backlinkStrengths) || 0;
 		const forelinkStrengths = Object.values(graph.links).map(linkSet => linkSet[i] || 0);
-		graph.moves[i].forelinkWeight = totalLinkWeight(forelinkStrengths);
+		graph.moves[i].forelinkWeight = totalLinkWeight(forelinkStrengths) || 0;
 	}
 	// naïvely mark critical moves: top 3 link weights in each direction
 	graph.moves.toSorted((a, b) => b.backlinkWeight - a.backlinkWeight).slice(0, 3)
@@ -82,8 +82,8 @@ function computeMoveWeights(graph) {
 	graph.moves.toSorted((a, b) => b.forelinkWeight - a.forelinkWeight).slice(0, 3)
 		.forEach(move => { move.forelinkCriticalMove = true; });
 	// calculate max forelink and backlink weights seen, for visual scaling
-	graph.maxForelinkWeight = Math.max(...graph.moves.map(move => move.forelinkWeight));
-	graph.maxBacklinkWeight = Math.max(...graph.moves.map(move => move.backlinkWeight));
+	graph.maxForelinkWeight = Math.max(...graph.moves.map(move => move.forelinkWeight)) || 0;
+	graph.maxBacklinkWeight = Math.max(...graph.moves.map(move => move.backlinkWeight)) || 0;
 }
 
 function entropy(pOn, pOff) {
@@ -121,7 +121,7 @@ function computeEntropy(graph) {
 		// get all pairs of move indexes (i,j) that are N apart
 		const moveIndexPairs = [];
 		for (let i = 0; i < graph.moves.length - horizon; i++) {
-			moveIndexPairs.push([i, i+horizon]);
+			moveIndexPairs.push([i, i + horizon]);
 		}
 		// get total link weight between these pairs
 		const horizonlinkStrengths = moveIndexPairs.map(([i, j]) => graph.links[j]?.[i] || 0);
@@ -171,7 +171,7 @@ function computeActorLinkStats(graph) {
 /// data processing
 
 async function embed(str) {
-	return (await extractor(str, {convert_to_tensor: "True", pooling: "mean", normalize: true}))[0];
+	return (await extractor(str, { convert_to_tensor: "True", pooling: "mean", normalize: true }))[0];
 }
 
 async function computeLinks(moves) {
@@ -199,13 +199,13 @@ async function computeLinks(moves) {
 function elbow(pt1, pt2) {
 	const x = (pt1.x + pt2.x) / 2;
 	const y = pt1.y - ((pt2.x - pt1.x) / 2);
-	return {x, y};
+	return { x, y };
 }
 
 // Given `props` augmented with the `idx` of a design move, return the location
 // at which this move should be rendered.
 function moveLoc(props) {
-	return {x: (props.idx * props.moveSpacing) + INIT_X, y: INIT_Y};
+	return { x: (props.idx * props.moveSpacing) + INIT_X, y: INIT_Y };
 }
 
 function shouldSegmentTimeline(currMove, prevMove) {
@@ -232,7 +232,7 @@ function DesignMove(props) {
 		});
 	}
 	else {
-		moveMarker = e("circle", {cx: currLoc.x, cy: currLoc.y, r: 5, fill: "red"});
+		moveMarker = e("circle", { cx: currLoc.x, cy: currLoc.y, r: 5, fill: "red" });
 	}
 	return e("g", {},
 		((MOVE_TEXT_MODE === "FULL") ? e("text", {
@@ -260,7 +260,7 @@ function DesignMove(props) {
 function makeTimelineDividers(props) {
 	const dividers = [];
 	for (let idx = 0; idx < props.moves.length; idx++) {
-		const currLoc = moveLoc({...props, idx});
+		const currLoc = moveLoc({ ...props, idx });
 		const splitAfter = shouldSegmentTimeline(props.moves[idx + 1], props.moves[idx]);
 		if (!splitAfter) continue;
 		dividers.push(e("line", {
@@ -276,10 +276,10 @@ function makeLinkObjects(props) {
 	const linkLines = [];
 	const linkJoints = [];
 	for (const [currIdx, linkSet] of Object.entries(props.links)) {
-		const currLoc = moveLoc({...props, idx: currIdx});
+		const currLoc = moveLoc({ ...props, idx: currIdx });
 		for (const [prevIdx, strength] of Object.entries(linkSet)) {
 			if (strength < MIN_LINK_STRENGTH) continue; // skip weak connections (arbitrary threshold)
-			const prevLoc = moveLoc({...props, idx: prevIdx});
+			const prevLoc = moveLoc({ ...props, idx: prevIdx });
 			const jointLoc = elbow(currLoc, prevLoc);
 			const lineStrength = scale(strength, [MIN_LINK_STRENGTH, 1], [255, 0]);
 			let color = "";
@@ -288,13 +288,13 @@ function makeLinkObjects(props) {
 				const prevActor = props.moves[prevIdx].actor || 0;
 				let targetColor = null;
 				if (currActor === prevActor && currActor === 0) {
-					targetColor = {red: 255, green: 0, blue: 0};
+					targetColor = { red: 255, green: 0, blue: 0 };
 				}
 				else if (currActor === prevActor && currActor === 1) {
-					targetColor = {red: 0, green: 0, blue: 255};
+					targetColor = { red: 0, green: 0, blue: 255 };
 				}
 				else {
-					targetColor = {red: 160, green: 0, blue: 255};
+					targetColor = { red: 160, green: 0, blue: 255 };
 				}
 				const r = scale(strength, [MIN_LINK_STRENGTH, 1], [255, targetColor.red]);
 				const g = scale(strength, [MIN_LINK_STRENGTH, 1], [255, targetColor.green]);
@@ -310,18 +310,18 @@ function makeLinkObjects(props) {
 			linkLines.push({
 				x1: prevLoc.x, y1: prevLoc.y, x2: jointLoc.x, y2: jointLoc.y, color, strength,
 			});
-			linkJoints.push({x: jointLoc.x, y: jointLoc.y, color, strength});
+			linkJoints.push({ x: jointLoc.x, y: jointLoc.y, color, strength });
 		}
 	}
-	return {linkLines, linkJoints};
+	return { linkLines, linkJoints };
 }
 
 function FuzzyLinkograph(props) {
 	const dividers = makeTimelineDividers(props);
-	const {linkLines, linkJoints} = makeLinkObjects(props);
-	return e("div", {className: "fuzzy-linkograph"},
+	const { linkLines, linkJoints } = makeLinkObjects(props);
+	return e("div", { className: "fuzzy-linkograph" },
 		e("h2", {}, props.title),
-		e("svg", {viewBox: `0 0 ${GRAPH_WIDTH} ${(GRAPH_WIDTH / 2) + INIT_Y}`},
+		e("svg", { viewBox: `0 0 ${GRAPH_WIDTH} ${(GRAPH_WIDTH / 2) + INIT_Y}` },
 			...dividers,
 			...linkLines.sort((a, b) => a.strength - b.strength).map(line => {
 				return e("line", {
@@ -330,9 +330,9 @@ function FuzzyLinkograph(props) {
 				});
 			}),
 			...linkJoints.sort((a, b) => a.strength - b.strength).map(joint => {
-				return e("circle", {cx: joint.x, cy: joint.y, r: 3, fill: joint.color});
+				return e("circle", { cx: joint.x, cy: joint.y, r: 3, fill: joint.color });
 			}),
-			...props.moves.map((_, idx) => e(DesignMove, {...props, idx}))
+			...props.moves.map((_, idx) => e(DesignMove, { ...props, idx }))
 		)
 	);
 }
@@ -373,10 +373,11 @@ async function loadDataset(datasetPath) {
 
 async function main() {
 	// load json-formatted data
-	const datasetPaths = [
+	// load json-formatted data
+	const datasetPaths = window.DATASETS_TO_LOAD || [
 		"./data/test.json",
-		"./data/papers.json",
-		"./data/imggen_50.json",
+		// "./data/papers.json",
+		// "./data/imggen_50.json",
 	];
 	for (const datasetPath of datasetPaths) {
 		await loadDataset(datasetPath);
@@ -393,7 +394,9 @@ async function main() {
 		if (episode.actors.size > 1) {
 			computeActorLinkStats(episode);
 		}
-		episode.moveSpacing = (GRAPH_WIDTH - (INIT_X * 2)) / (episode.moves.length - 1);
+		episode.moveSpacing = (episode.moves.length > 1)
+			? (GRAPH_WIDTH - (INIT_X * 2)) / (episode.moves.length - 1)
+			: 0;
 		console.log(episode);
 	}
 	renderUI();

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Show, Don't Tell: Trail-Aware Tools</title>
+	<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+	<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+	<style>
+		body {
+			font-family: 'Helvetica Neue', Arial, sans-serif;
+			line-height: 1.6;
+			color: #333;
+			max-width: 900px;
+			margin: 0 auto;
+			padding: 40px;
+			background-color: #f9f9f9;
+		}
+		h1 { font-size: 2.5em; margin-bottom: 0.2em; color: #222; }
+		h2 { margin-top: 2em; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+		.abstract {
+			font-size: 1.1em;
+			font-style: italic;
+			background: #fff;
+			padding: 20px;
+			border-left: 5px solid #007bff;
+			margin: 20px 0;
+			box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+		}
+		.visualization-container {
+			background: #fff;
+			border: 1px solid #ddd;
+			border-radius: 8px;
+			padding: 20px;
+			margin: 30px 0;
+			box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+			text-align: center;
+		}
+		.visualization-container h3 {
+			margin-top: 0;
+			color: #555;
+			text-transform: uppercase;
+			font-size: 0.9em;
+			letter-spacing: 1px;
+		}
+		#app { width: 100%; overflow-x: auto; }
+		svg { max-width: 100%; height: auto; }
+		.highlight {
+			background-color: #e8f0fe;
+			padding: 2px 5px;
+			border-radius: 3px;
+			font-weight: bold;
+			color: #1a73e8;
+		}
+		footer {
+			margin-top: 50px;
+			text-align: center;
+			font-size: 0.8em;
+			color: #888;
+		}
+	</style>
+</head>
+<body>
+
+	<h1>Towards Trail-Aware Digital Content Creation Tools</h1>
+	<p><strong>Noor Hammad</strong> | Human-Computer Interaction Institute, Carnegie Mellon University</p>
+
+	<div class="abstract">
+		"Digital creation inherently generates a <span class="highlight">creator trail</span>; an evolving record of ideas, intermediate artifacts, metadata, and creative decisions."
+	</div>
+
+	<h2>1. What is a "Creator Trail"?</h2>
+	<p>
+		Digital media creators, like streamers and game developers, perform a complex dance of actions. They don't just "make content"; they navigate a non-linear path of experimentation, troubleshooting, and performance. 
+	</p>
+	<p>
+		Hammad proposes that we treat this <strong>trail of data</strong> (movements, edits, logs, chat interactions) not as waste, but as a <em>first-class design material</em>.
+	</p>
+	
+	<p>
+		Below, we <strong>show</strong> you what such a trail looks like using <em>Fuzzy Linkography</em>. PRO TIP: Open the developer console (F12) to see the app processing the semantic links between these moves in real-time!
+	</p>
+
+	<div class="visualization-container">
+		<h3>Visualizing a Streamer's "Episode"</h3>
+		<p><em>(Scroll horizontally if the graph is wide)</em></p>
+		<div id="app"></div>
+	</div>
+
+	<h2>2. Why does this matter?</h2>
+	<p>
+		Notice the connections in the graph above? The <span style="color: #f1a340">orange arcs</span> (forelinks) and <span style="color: #998ec3">purple arcs</span> (backlinks) show how ideas and actions recur over time.
+	</p>
+	<ul>
+		<li><strong>High Density:</strong> A dense web of links implies a focused, recurring theme (e.g., repeatedly troubleshooting the same audio bug).</li>
+		<li><strong>Gaps:</strong> Gaps might indicate context switching—jumping from "Gameplay" to "Chat Interaction" and back.</li>
+	</ul>
+	<p>
+		<strong>Trail-Aware Tools</strong> would see these patterns <em>as they happen</em>. Instead of a static interface, imagine OBS (Open Broadcaster Software) realizing you are in a "Troubleshooting Loop" (dense local links) and automatically offering diagnostic tools, or noticing you are in a "Performance Flow" and minimizing distractions.
+	</p>
+
+	<h2>3. The Research Gap</h2>
+	<p>
+		Most current tools are "amnesic"—they forget what you just did. They don't know if you are exploring (divergent trail) or refining (convergent trail). Hammad's thesis argues for systems that:
+	</p>
+	<ol>
+		<li><strong>Recognize</strong> the trail (like the graph above does).</li>
+		<li><strong>Adapt</strong> to the creator's current "mode" based on that trail.</li>
+	</ol>
+
+	<footer>
+		<p>Generated for <strong>Fuzzy Linkography</strong> Demo | Based on work by Noor Hammad (2025)</p>
+	</footer>
+
+	<!-- Configure the app to load our specific demo dataset -->
+	<script>
+		window.DATASETS_TO_LOAD = ["./data/trail_demos.json"];
+	</script>
+	<!-- Load the main application module -->
+	<script type="module" src="./app.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Creator Trail Mapper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --color-accent: #88ff88;
+            --color-bg: #050508;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-bg);
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            overflow: hidden;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .tab-btn {
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background-color: rgba(136, 255, 136, 0.2);
+            color: var(--color-accent);
+            border-color: var(--color-accent);
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 92vw;
+            height: 92vw;
+            max-width: 500px;
+            max-height: 500px;
+            background: #0a0a10;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+            touch-action: none;
+            margin: 0 auto;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #1a1a20;
+            border-radius: 4px;
+            outline: none;
+            margin: 6px 0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--color-accent);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 0 3px #050508;
+            transition: all 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:active {
+            transform: scale(1.2);
+            box-shadow: 0 0 0 4px #050508, 0 0 10px var(--color-accent);
+        }
+
+        .panel-title {
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 6px;
+            margin-bottom: 10px;
+            color: #ccc;
+            font-size: 0.75rem;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.6rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #666;
+            margin-bottom: 2px;
+        }
+
+        .trail-label {
+            position: absolute;
+            pointer-events: none;
+            font-size: 0.6rem;
+            padding: 2px 4px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 2px;
+            color: #88ff88;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .pattern-node {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            pointer-events: none;
+            background: #ff8888;
+            box-shadow: 0 0 6px #ff8888;
+        }
+
+        .mobile-panel {
+            padding: 12px;
+            border-radius: 12px;
+        }
+    </style>
+</head>
+
+<body class="flex flex-col items-center justify-start h-screen p-3 gap-3">
+
+    <!-- Header with Tabs -->
+    <div class="w-full max-w-md flex gap-1 bg-[#0a0a10] rounded-lg p-1 border border-white/10">
+        <button id="tab-topo"
+            class="tab-btn active flex-1 py-2 px-3 text-xs uppercase tracking-wider rounded-md border border-transparent text-gray-400">
+            Trail Map
+        </button>
+        <button id="tab-sonics"
+            class="tab-btn flex-1 py-2 px-3 text-xs uppercase tracking-wider rounded-md border border-transparent text-gray-400">
+            Pattern Analysis
+        </button>
+    </div>
+
+    <!-- Canvas -->
+    <div id="canvas-container" class="rounded-xl">
+        <canvas id="trailCanvas"></canvas>
+
+        <!-- Enhanced Readout -->
+        <div id="readout" class="absolute top-3 right-3 text-right pointer-events-none">
+            <div class="text-xs text-gray-500 uppercase tracking-wider">Pattern Density</div>
+            <div class="text-sm font-bold text-green-400" id="pattern-density">0.00%</div>
+            <div class="text-xs text-gray-400" id="active-patterns">0 patterns</div>
+        </div>
+
+        <!-- Start Overlay -->
+        <div id="start-overlay"
+            class="absolute inset-0 flex items-center justify-center transition-opacity duration-500 z-10 bg-black/80 backdrop-blur-sm">
+            <div id="start-text"
+                class="text-white text-xs tracking-widest uppercase border border-white/30 p-4 rounded-lg bg-black/50 cursor-pointer animate-pulse">
+                Draw your creative trail
+            </div>
+        </div>
+    </div>
+
+    <!-- Control Panels Container -->
+    <div class="w-full max-w-md flex-1 flex flex-col gap-3 overflow-hidden">
+
+        <!-- Tab 1: Trail Map -->
+        <div id="topo-tab" class="tab-content active bg-[#0a0a10] mobile-panel border border-white/10 shadow-lg">
+            <div class="panel-title">Trail Parameters</div>
+
+            <div class="space-y-3">
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span>Load Trail Data</span>
+                    </div>
+                    <select id="trail-select"
+                        class="w-full bg-white/5 border border-white/10 text-green-400 p-2 rounded-lg text-xs">
+                        <option value="">Draw your own trail...</option>
+                    </select>
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span>Trail Persistence</span>
+                        <span id="val-persistence" class="text-green-400 font-mono">0.85</span>
+                    </div>
+                    <input type="range" id="persistence-slider" min="0.7" max="0.98" step="0.01" value="0.85">
+                </div>
+
+
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span>Pattern Sensitivity</span>
+                        <span id="val-sensitivity" class="text-green-400 font-mono">0.65</span>
+                    </div>
+                    <input type="range" id="sensitivity-slider" min="0.3" max="0.9" step="0.05" value="0.65">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span>Contour Levels</span>
+                        <span id="val-contours" class="text-green-400 font-mono">8</span>
+                    </div>
+                    <input type="range" id="contour-slider" min="4" max="16" step="1" value="8">
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button class="btn flex-1 bg-white/5 hover:bg-white/10 text-gray-400 active"
+                        id="mode-contour">Contour Map</button>
+                    <button class="btn flex-1 bg-white/5 hover:bg-white/10 text-gray-400" id="mode-heat">Heat
+                        Map</button>
+                </div>
+
+                <div class="pt-2">
+                    <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Trail Types</div>
+                    <div class="flex gap-1">
+                        <button class="btn flex-1 bg-blue-800/20 hover:bg-blue-800/40 text-blue-300 text-xs"
+                            id="btn-stream">Streaming</button>
+                        <button class="btn flex-1 bg-purple-800/20 hover:bg-purple-800/40 text-purple-300 text-xs"
+                            id="btn-edit">Editing</button>
+                        <button class="btn flex-1 bg-amber-800/20 hover:bg-amber-800/40 text-amber-300 text-xs"
+                            id="btn-game">Game Dev</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Pattern Analysis -->
+        <div id="sonics-tab" class="tab-content bg-[#0a0a10] mobile-panel border border-white/10 shadow-lg">
+            <div class="panel-title">Pattern Recognition</div>
+
+            <div class="space-y-3">
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span>Learning Rate</span>
+                        <span id="val-learning" class="text-green-400 font-mono">0.75</span>
+                    </div>
+                    <input type="range" id="learning-slider" min="0.1" max="1.0" step="0.05" value="0.75">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span>Adaptation Speed</span>
+                        <span id="val-adaptation" class="text-green-400 font-mono">Medium</span>
+                    </div>
+                    <select id="adaptation-select"
+                        class="w-full bg-white/5 border border-white/10 text-white p-2 rounded-lg text-xs focus:ring-green-500 focus:border-green-500">
+                        <option value="slow">Slow (Observant)</option>
+                        <option value="medium" selected>Medium (Balanced)</option>
+                        <option value="fast">Fast (Responsive)</option>
+                    </select>
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span>Branch Detection</span>
+                        <span id="val-branching" class="text-green-400 font-mono">60%</span>
+                    </div>
+                    <input type="range" id="branching-slider" min="0" max="100" step="5" value="60">
+                </div>
+
+                <div class="pt-2">
+                    <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Detected Patterns</div>
+                    <div class="space-y-1">
+                        <div class="text-xs text-green-300 flex justify-between">
+                            <span>▶ Clutch Win Routine</span>
+                            <span class="text-gray-400">87% match</span>
+                        </div>
+                        <div class="text-xs text-blue-300 flex justify-between">
+                            <span>▶ Game Switch Flow</span>
+                            <span class="text-gray-400">72% match</span>
+                        </div>
+                        <div class="text-xs text-amber-300 flex justify-between">
+                            <span>▶ Audio Fix Pattern</span>
+                            <span class="text-gray-400">65% match</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn w-full bg-green-800/20 hover:bg-green-800/40 text-green-300" id="btn-suggest">
+                    Show Tool Suggestions
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CORE CONFIGURATION ---
+        const TRAIL_RESOLUTION = 40;
+        const CONTOUR_RES = 60;
+        const TICK_RATE = 20;
+
+        // Different trail types with colors
+        const TRAIL_TYPES = {
+            'streaming': { color: '#4f46e5', decay: 0.92, weight: 1.2 },
+            'editing': { color: '#8b5cf6', decay: 0.95, weight: 1.0 },
+            'gamedev': { color: '#f59e0b', decay: 0.88, weight: 0.9 }
+        };
+
+        let currentTrailType = 'streaming';
+
+        // Grid for trail density
+        let trailGrid = new Float32Array(TRAIL_RESOLUTION * TRAIL_RESOLUTION).fill(0);
+        let highResContour = new Float32Array(CONTOUR_RES * CONTOUR_RES).fill(0);
+
+        // Store trail points for rendering
+        let trailPoints = [];
+        let patternNodes = [];
+
+        let visualParams = {
+            persistence: 0.85,
+            sensitivity: 0.65,
+            contourLevels: 8,
+            renderMode: 'contour',
+            learningRate: 0.75,
+            adaptation: 'medium',
+            branching: 0.6
+        };
+
+        let patternDensity = 0;
+        let allTrails = {};
+
+        // Load actual trail data
+        async function loadTrailData() {
+            try {
+                const [demosRes, testRes] = await Promise.all([
+                    fetch('./data/trail_demos.json'),
+                    fetch('./data/test.json')
+                ]);
+                const demos = await demosRes.json();
+                const test = await testRes.json();
+                allTrails = { ...demos, ...test };
+
+                const sel = document.getElementById('trail-select');
+                Object.keys(allTrails).forEach(k => {
+                    const opt = document.createElement('option');
+                    opt.value = k;
+                    opt.textContent = k;
+                    sel.appendChild(opt);
+                });
+
+                sel.addEventListener('change', e => {
+                    if (e.target.value) loadTrailIntoGrid(e.target.value);
+                });
+            } catch (e) {
+                console.error('Failed to load trail data', e);
+            }
+        }
+
+        function loadTrailIntoGrid(key) {
+            const data = allTrails[key];
+            const moves = Array.isArray(data) ? data : (data.moves || []);
+
+            // Reset
+            trailGrid.fill(0);
+            trailPoints = [];
+            patternNodes = [];
+
+            // Place trail points along a path
+            moves.forEach((move, i) => {
+                const t = i / Math.max(moves.length - 1, 1);
+                const x = t * width * 0.9 + width * 0.05;
+                const y = height * 0.5 + Math.sin(t * Math.PI * 3) * height * 0.3;
+
+                addTrailPoint(x, y, 0.8 + Math.random() * 0.3, currentTrailType);
+            });
+
+            // Hide overlay
+            if (startOverlay.style.opacity !== '0') {
+                startOverlay.style.opacity = 0;
+                setTimeout(() => startOverlay.style.display = 'none', 500);
+            }
+        }
+
+        let activePatterns = 0;
+
+        const canvas = document.getElementById('trailCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+        const startOverlay = document.getElementById('start-overlay');
+        let width, height;
+
+        let isPlaying = true;
+        let lastTick = 0;
+        let time = 0;
+
+        // --- TRAIL MANAGEMENT ---
+        function addTrailPoint(x, y, intensity = 1.0, type = null) {
+            const typeConfig = TRAIL_TYPES[type || currentTrailType];
+
+            // Add to high-resolution grid
+            const gx = Math.floor((x / width) * TRAIL_RESOLUTION);
+            const gy = Math.floor((y / height) * TRAIL_RESOLUTION);
+
+            if (gx >= 0 && gx < TRAIL_RESOLUTION && gy >= 0 && gy < TRAIL_RESOLUTION) {
+                const idx = gy * TRAIL_RESOLUTION + gx;
+                trailGrid[idx] = Math.min(trailGrid[idx] + intensity * typeConfig.weight, 3.0);
+            }
+
+            // Store point for rendering
+            trailPoints.push({
+                x, y,
+                intensity,
+                type: type || currentTrailType,
+                timestamp: time,
+                color: typeConfig.color,
+                alpha: 1.0
+            });
+
+            // Keep last 200 points
+            if (trailPoints.length > 200) {
+                trailPoints = trailPoints.slice(-200);
+            }
+
+            // Occasionally add pattern nodes
+            if (Math.random() < 0.05 * intensity) {
+                addPatternNode(x, y, type || currentTrailType);
+            }
+        }
+
+        function addPatternNode(x, y, type) {
+            patternNodes.push({
+                x, y,
+                type,
+                size: 6 + Math.random() * 8,
+                growth: 0,
+                maxSize: 10 + Math.random() * 10,
+                color: TRAIL_TYPES[type].color,
+                connections: []
+            });
+
+            if (patternNodes.length > 30) {
+                patternNodes = patternNodes.slice(-30);
+            }
+        }
+
+        function getGridIdx(x, y, res) { return y * res + x; }
+
+        // --- SIMULATION TICK ---
+        function tick() {
+            time += 0.01;
+
+            // Decay the trail grid
+            for (let i = 0; i < trailGrid.length; i++) {
+                trailGrid[i] *= visualParams.persistence;
+                if (trailGrid[i] < 0.01) trailGrid[i] = 0;
+            }
+
+            // Fade trail points
+            for (let i = trailPoints.length - 1; i >= 0; i--) {
+                trailPoints[i].alpha *= 0.97;
+                if (trailPoints[i].alpha < 0.05) {
+                    trailPoints.splice(i, 1);
+                }
+            }
+
+            // Animate pattern nodes
+            for (let node of patternNodes) {
+                node.growth = Math.sin(time * 2 + node.x * 0.01) * 0.5 + 0.5;
+                node.size = 6 + node.growth * node.maxSize;
+            }
+
+            // Generate high-resolution contour data
+            const factor = (TRAIL_RESOLUTION - 1) / (CONTOUR_RES - 1);
+            for (let y = 0; y < CONTOUR_RES; y++) {
+                for (let x = 0; x < CONTOUR_RES; x++) {
+                    const lx = x * factor;
+                    const ly = y * factor;
+                    const x0 = Math.floor(lx);
+                    const y0 = Math.floor(ly);
+                    const x1 = Math.min(x0 + 1, TRAIL_RESOLUTION - 1);
+                    const y1 = Math.min(y0 + 1, TRAIL_RESOLUTION - 1);
+                    const tx = lx - x0;
+                    const ty = ly - y0;
+
+                    const v00 = trailGrid[getGridIdx(x0, y0, TRAIL_RESOLUTION)];
+                    const v10 = trailGrid[getGridIdx(x1, y0, TRAIL_RESOLUTION)];
+                    const v01 = trailGrid[getGridIdx(x0, y1, TRAIL_RESOLUTION)];
+                    const v11 = trailGrid[getGridIdx(x1, y1, TRAIL_RESOLUTION)];
+
+                    const top = v00 * (1 - tx) + v10 * tx;
+                    const bot = v01 * (1 - tx) + v11 * tx;
+                    highResContour[getGridIdx(x, y, CONTOUR_RES)] = top * (1 - ty) + bot * ty;
+                }
+            }
+
+            // Calculate pattern density
+            let total = 0;
+            for (let val of trailGrid) total += val;
+            patternDensity = Math.min(total / (TRAIL_RESOLUTION * TRAIL_RESOLUTION * 2) * 100, 100);
+
+            // Update active patterns based on nodes
+            activePatterns = Math.min(patternNodes.length, 99);
+
+            // Update UI
+            document.getElementById('pattern-density').innerText = `${patternDensity.toFixed(1)}%`;
+            document.getElementById('active-patterns').innerText = `${activePatterns} patterns`;
+        }
+
+        // --- RENDERING ---
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            if (visualParams.renderMode === 'contour') {
+                drawBackgroundGrid();
+                drawContourMap();
+            } else {
+                drawHeatMap();
+            }
+
+            drawTrailPoints();
+            drawPatternNodes();
+
+            // Draw trail type label
+            ctx.fillStyle = TRAIL_TYPES[currentTrailType].color;
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(currentTrailType.toUpperCase(), 10, 20);
+        }
+
+        function drawBackgroundGrid() {
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            const step = width / 12;
+
+            ctx.beginPath();
+            for (let x = 0; x <= width; x += step) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+            }
+            for (let y = 0; y <= height; y += step) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+            }
+            ctx.stroke();
+        }
+
+        function drawContourMap() {
+            const cellW = width / (CONTOUR_RES - 1);
+            const cellH = height / (CONTOUR_RES - 1);
+            const levels = visualParams.contourLevels;
+            const sensitivity = visualParams.sensitivity;
+
+            for (let l = 1; l <= levels; l++) {
+                const threshold = (l / levels) * sensitivity;
+                const hue = 120 - (l / levels) * 40; // Green to yellow
+                const alpha = 0.1 + (l / levels) * 0.7;
+                ctx.strokeStyle = `hsla(${hue}, 80%, 60%, ${alpha})`;
+                ctx.lineWidth = 2.0 - (l / levels * 1.2);
+                ctx.lineJoin = 'round';
+
+                ctx.beginPath();
+                for (let y = 0; y < CONTOUR_RES - 1; y++) {
+                    for (let x = 0; x < CONTOUR_RES - 1; x++) {
+                        const v0 = highResContour[getGridIdx(x, y, CONTOUR_RES)];
+                        const v1 = highResContour[getGridIdx(x + 1, y, CONTOUR_RES)];
+                        const v2 = highResContour[getGridIdx(x + 1, y + 1, CONTOUR_RES)];
+                        const v3 = highResContour[getGridIdx(x, y + 1, CONTOUR_RES)];
+
+                        const bin = (v0 > threshold ? 8 : 0) | (v1 > threshold ? 4 : 0) | (v2 > threshold ? 2 : 0) | (v3 > threshold ? 1 : 0);
+                        if (bin === 0 || bin === 15) continue;
+
+                        const a = { x: x + (threshold - v0) / (v1 - v0), y: y };
+                        const b = { x: x + 1, y: y + (threshold - v1) / (v2 - v1) };
+                        const c = { x: x + (threshold - v3) / (v2 - v3), y: y + 1 };
+                        const d = { x: x, y: y + (threshold - v0) / (v3 - v0) };
+
+                        const sx = v => v.x * cellW;
+                        const sy = v => v.y * cellH;
+
+                        switch (bin) {
+                            case 1: case 14: ctx.moveTo(sx(c), sy(c)); ctx.lineTo(sx(d), sy(d)); break;
+                            case 2: case 13: ctx.moveTo(sx(b), sy(b)); ctx.lineTo(sx(c), sy(c)); break;
+                            case 3: case 12: ctx.moveTo(sx(b), sy(b)); ctx.lineTo(sx(d), sy(d)); break;
+                            case 4: case 11: ctx.moveTo(sx(a), sy(a)); ctx.lineTo(sx(b), sy(b)); break;
+                            case 5: ctx.moveTo(sx(a), sy(a)); ctx.lineTo(sx(d), sy(d)); ctx.moveTo(sx(b), sy(b)); ctx.lineTo(sx(c), sy(c)); break;
+                            case 6: case 9: ctx.moveTo(sx(a), sy(a)); ctx.lineTo(sx(c), sy(c)); break;
+                            case 7: case 8: ctx.moveTo(sx(a), sy(a)); ctx.lineTo(sx(d), sy(d)); break;
+                            case 10: ctx.moveTo(sx(a), sy(a)); ctx.lineTo(sx(b), sy(b)); ctx.moveTo(sx(c), sy(c)); ctx.lineTo(sx(d), sy(d)); break;
+                        }
+                    }
+                }
+                ctx.stroke();
+            }
+        }
+
+        function drawHeatMap() {
+            const cellW = width / (TRAIL_RESOLUTION - 1);
+            const cellH = height / (TRAIL_RESOLUTION - 1);
+
+            for (let i = 0; i < trailGrid.length; i++) {
+                const val = trailGrid[i];
+                if (val < 0.01) continue;
+                const x = (i % TRAIL_RESOLUTION) * cellW;
+                const y = Math.floor(i / TRAIL_RESOLUTION) * cellH;
+
+                const hue = 120 - Math.min(val * 40, 40);
+                const alpha = Math.min(val * 0.3, 0.6);
+                ctx.fillStyle = `hsla(${hue}, 80%, 60%, ${alpha})`;
+                ctx.fillRect(x, y, cellW + 1, cellH + 1);
+            }
+        }
+
+        function drawTrailPoints() {
+            for (let point of trailPoints) {
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 3 + point.intensity * 2, 0, Math.PI * 2);
+                ctx.fillStyle = point.color.replace(')', `, ${point.alpha})`).replace('rgb', 'rgba');
+                ctx.fill();
+
+                // Draw faint glow
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 6 + point.intensity * 3, 0, Math.PI * 2);
+                ctx.strokeStyle = point.color.replace(')', `, ${point.alpha * 0.3})`).replace('rgb', 'rgba');
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        function drawPatternNodes() {
+            for (let node of patternNodes) {
+                // Draw connections
+                for (let otherNode of patternNodes) {
+                    if (otherNode === node) continue;
+                    const dx = otherNode.x - node.x;
+                    const dy = otherNode.y - node.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < 80) {
+                        ctx.beginPath();
+                        ctx.moveTo(node.x, node.y);
+                        ctx.lineTo(otherNode.x, otherNode.y);
+                        ctx.strokeStyle = node.color.replace(')', `, 0.1)`).replace('rgb', 'rgba');
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    }
+                }
+
+                // Draw node
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, node.size * 0.5, 0, Math.PI * 2);
+                ctx.fillStyle = node.color.replace(')', `, 0.7)`).replace('rgb', 'rgba');
+                ctx.fill();
+
+                // Draw pulsing ring
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, node.size * 0.7 + Math.sin(time * 3) * 2, 0, Math.PI * 2);
+                ctx.strokeStyle = node.color.replace(')', `, 0.4)`).replace('rgb', 'rgba');
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        }
+
+        // --- INTERACTION ---
+        function handleInteraction(e) {
+            e.preventDefault();
+
+            const rect = container.getBoundingClientRect();
+            const touches = e.touches || [{ clientX: e.clientX, clientY: e.clientY }];
+
+            for (let touch of touches) {
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+
+                // Add trail with some random variation
+                const intensity = 0.8 + Math.random() * 0.4;
+                addTrailPoint(x, y, intensity);
+
+                // Add some "branching" based on parameter
+                if (Math.random() < visualParams.branching / 100) {
+                    const branchX = x + (Math.random() - 0.5) * 40;
+                    const branchY = y + (Math.random() - 0.5) * 40;
+                    addTrailPoint(branchX, branchY, intensity * 0.6);
+                }
+            }
+
+            // Hide start overlay
+            if (startOverlay.style.opacity !== '0') {
+                startOverlay.style.opacity = 0;
+                setTimeout(() => startOverlay.style.display = 'none', 500);
+            }
+        }
+
+        // --- UI SETUP ---
+        function setupEventListeners() {
+            // Tab switching
+            const tabTopo = document.getElementById('tab-topo');
+            const tabSonics = document.getElementById('tab-sonics');
+            const topoContent = document.getElementById('topo-tab');
+            const sonicsContent = document.getElementById('sonics-tab');
+
+            tabTopo.addEventListener('click', () => {
+                topoContent.classList.add('active');
+                sonicsContent.classList.remove('active');
+                tabTopo.classList.add('active');
+                tabSonics.classList.remove('active');
+            });
+
+            tabSonics.addEventListener('click', () => {
+                sonicsContent.classList.add('active');
+                topoContent.classList.remove('active');
+                tabSonics.classList.add('active');
+                tabTopo.classList.remove('active');
+            });
+
+            // Canvas interaction
+            canvas.addEventListener('mousedown', e => {
+                handleInteraction(e);
+                canvas.addEventListener('mousemove', handleInteraction);
+            });
+            window.addEventListener('mouseup', () => canvas.removeEventListener('mousemove', handleInteraction));
+
+            canvas.addEventListener('touchstart', e => {
+                handleInteraction(e);
+                canvas.addEventListener('touchmove', handleInteraction, { passive: false });
+            }, { passive: false });
+            canvas.addEventListener('touchend', () => canvas.removeEventListener('touchmove', handleInteraction));
+
+            startOverlay.addEventListener('click', handleInteraction, { once: true });
+
+            // Sliders
+            const sliders = [
+                { id: 'persistence-slider', valId: 'val-persistence', key: 'persistence', type: 'float' },
+                { id: 'sensitivity-slider', valId: 'val-sensitivity', key: 'sensitivity', type: 'float' },
+                { id: 'contour-slider', valId: 'val-contours', key: 'contourLevels', type: 'int' },
+                { id: 'learning-slider', valId: 'val-learning', key: 'learningRate', type: 'float' },
+                { id: 'branching-slider', valId: 'val-branching', key: 'branching', type: 'percent' }
+            ];
+
+            sliders.forEach(slider => {
+                const element = document.getElementById(slider.id);
+                const valElement = document.getElementById(slider.valId);
+
+                element.addEventListener('input', e => {
+                    let value;
+                    if (slider.type === 'int') {
+                        value = parseInt(e.target.value);
+                        valElement.innerText = value;
+                    } else if (slider.type === 'float') {
+                        value = parseFloat(e.target.value);
+                        valElement.innerText = value.toFixed(2);
+                    } else if (slider.type === 'percent') {
+                        value = parseInt(e.target.value);
+                        valElement.innerText = `${value}%`;
+                    }
+
+                    visualParams[slider.key] = value;
+                });
+            });
+
+            // Adaptation selector
+            document.getElementById('adaptation-select').addEventListener('change', e => {
+                visualParams.adaptation = e.target.value;
+                document.getElementById('val-adaptation').innerText =
+                    e.target.selectedOptions[0].text.split('(')[0].trim();
+            });
+
+            // Visual mode buttons
+            const btnContour = document.getElementById('mode-contour');
+            const btnHeat = document.getElementById('mode-heat');
+            btnContour.addEventListener('click', () => {
+                visualParams.renderMode = 'contour';
+                btnContour.classList.add('active');
+                btnHeat.classList.remove('active');
+            });
+            btnHeat.addEventListener('click', () => {
+                visualParams.renderMode = 'heat';
+                btnHeat.classList.add('active');
+                btnContour.classList.remove('active');
+            });
+
+            // Trail type buttons
+            document.getElementById('btn-stream').addEventListener('click', () => {
+                currentTrailType = 'streaming';
+                updateTrailButtons();
+            });
+            document.getElementById('btn-edit').addEventListener('click', () => {
+                currentTrailType = 'editing';
+                updateTrailButtons();
+            });
+            document.getElementById('btn-game').addEventListener('click', () => {
+                currentTrailType = 'gamedev';
+                updateTrailButtons();
+            });
+
+            // Suggestion button
+            document.getElementById('btn-suggest').addEventListener('click', () => {
+                showToolSuggestions();
+            });
+        }
+
+        function updateTrailButtons() {
+            const buttons = ['btn-stream', 'btn-edit', 'btn-game'];
+            buttons.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.classList.remove('border', 'border-green-500');
+            });
+            const activeBtn = document.getElementById(`btn-${currentTrailType.replace('gamedev', 'game')}`);
+            if (activeBtn) activeBtn.classList.add('border', 'border-green-500');
+        }
+
+        function showToolSuggestions() {
+            const suggestions = [
+                "🎮 Auto-switch to HYPE overlay on clutch wins",
+                "🎬 Suggest music based on your past mood choices",
+                "🎙️ Auto-adjust audio when switching games",
+                "✂️ Pre-cut silence based on your usual edits",
+                "🎯 Highlight viewer peaks with your favorite alerts"
+            ];
+
+            alert("Tool Suggestions:\n\n" +
+                suggestions[Math.floor(Math.random() * suggestions.length)] + "\n\n" +
+                "Based on your trail patterns, the system would adapt to your workflow.");
+        }
+
+        // --- APP LIFECYCLE ---
+        function initApp() {
+            resize();
+            setupEventListeners();
+            updateTrailButtons();
+            loadTrailData();
+            loop();
+        }
+
+        function resize() {
+            const rect = container.getBoundingClientRect();
+            width = rect.width;
+            height = rect.height;
+            const dpr = window.devicePixelRatio || 2;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            ctx.scale(dpr, dpr);
+        }
+
+        function loop(timestamp) {
+            if (isPlaying && timestamp - lastTick > TICK_RATE) {
+                tick();
+                lastTick = timestamp;
+            }
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        window.addEventListener('resize', resize);
+        window.addEventListener('load', initApp);
+    </script>
+</body>
+
+</html>

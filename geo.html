@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ATG · Associative Terrain Graph</title>
+    <style>
+        :root {
+            --accent: #c4a77d;
+            --accent2: #8fb8a0;
+            --bg: #0d0d0d;
+            --dim: #2a2a2a;
+            --warm: #d4956a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: #ccc;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px;
+            gap: 12px;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow-x: hidden;
+        }
+
+        h1 {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--accent);
+            opacity: 0.95;
+        }
+
+        .subtitle {
+            font-size: 0.6rem;
+            font-weight: 400;
+            letter-spacing: 0.1em;
+            color: var(--accent2);
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+
+        #canvas-wrap {
+            position: relative;
+            width: min(92vw, 560px);
+            height: min(92vw, 560px);
+            background: radial-gradient(circle at 50% 50%, #111118, #0a0a0f);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(196, 167, 125, 0.1), inset 0 0 80px rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(196, 167, 125, 0.15);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        #overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s;
+            z-index: 10;
+        }
+
+        #overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #overlay-text {
+            color: var(--accent);
+            font-size: 0.7rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            padding: 16px 28px;
+            border: 1px solid rgba(127, 219, 202, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.5
+            }
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            max-width: 560px;
+        }
+
+        select,
+        input[type="range"] {
+            background: #151520;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--accent);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            outline: none;
+        }
+
+        select {
+            padding: 8px 12px;
+            min-width: 140px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 120px;
+            height: 6px;
+            border-radius: 3px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .btn {
+            padding: 10px 16px;
+            background: rgba(127, 219, 202, 0.1);
+            border: 1px solid rgba(127, 219, 202, 0.3);
+            color: var(--accent);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            transition: all 0.15s;
+        }
+
+        .btn:hover {
+            background: rgba(127, 219, 202, 0.2);
+        }
+
+        .btn.active {
+            background: rgba(127, 219, 202, 0.35);
+        }
+
+        .scrubber {
+            width: 100%;
+            max-width: 560px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .scrubber input[type="range"] {
+            flex: 1;
+            height: 8px;
+        }
+
+        .scrubber-label {
+            font-size: 0.7rem;
+            color: var(--accent);
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .stats {
+            display: flex;
+            gap: 16px;
+            font-size: 0.65rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .stats span {
+            color: var(--accent);
+        }
+
+        .vu {
+            width: 100%;
+            max-width: 560px;
+            height: 4px;
+            background: #111;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .vu-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent), #ffcc66);
+            transition: width 0.08s;
+        }
+    </style>
+</head>
+
+<body>
+    <header style="text-align: center; width: 100%; max-width: 580px;">
+        <h1>ATG · Associative Terrain Graph</h1>
+        <div class="subtitle" id="current-trail">Select a trail to begin</div>
+
+        <!-- Compact Node Info in Header (mobile-friendly) -->
+        <div id="node-info-header"
+            style="display: none; margin: 8px auto; padding: 8px 16px; background: rgba(20,20,20,0.9); border: 1px solid var(--accent); border-radius: 8px; max-width: 400px;">
+            <span id="node-header-name" style="color: #fff; font-weight: 600;"></span>
+            <span id="node-header-links" style="color: var(--accent2); font-size: 0.75rem; margin-left: 8px;"></span>
+        </div>
+    </header>
+
+    <div id="canvas-wrap">
+        <canvas id="c"></canvas>
+        <div id="overlay">
+            <div id="overlay-text">Tap to Blaze Trail</div>
+        </div>
+    </div>
+
+    <div class="scrubber">
+        <span class="scrubber-label" id="step-label">0 / 0</span>
+        <input type="range" id="scrub" min="0" max="1" step="1" value="0">
+        <button class="btn" id="btn-play">▶ Play</button>
+    </div>
+
+    <div class="controls">
+        <select id="trail-sel">
+            <option value="" disabled selected>Select Trail...</option>
+        </select>
+        <select id="view-mode">
+            <option value="contour">Contour</option>
+            <option value="heatmap">Heatmap</option>
+        </select>
+        <select id="harmony-sel">
+            <option value="minor">Minor</option>
+            <option value="major">Major</option>
+            <option value="penta">Pentatonic</option>
+        </select>
+        <input type="range" id="threshold" min="0" max="0.5" step="0.01" value="0.1" title="Link Threshold">
+    </div>
+
+    <div class="stats">
+        Links: <span id="s-links">0</span> |
+        Density: <span id="s-density">0.00</span> |
+        Moves: <span id="s-moves">0</span>
+    </div>
+
+    <!-- Terrain Evolution Snapshots (zen minimal) -->
+    <div id="snapshot-section" style="margin: 20px auto; max-width: 580px; width: 92%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div
+                style="font-size: 0.6rem; letter-spacing: 0.2em; color: var(--accent); text-transform: uppercase; opacity: 0.8;">
+                Terrain Evolution</div>
+            <button id="download-all-btn"
+                style="display: none; font-size: 0.6rem; padding: 4px 10px; background: transparent; border: 1px solid var(--dim); color: var(--accent2); border-radius: 4px; cursor: pointer;"
+                title="Download current terrain">↓ Save</button>
+        </div>
+        <div id="snapshot-grid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;"></div>
+    </div>
+    <div class="vu">
+        <div class="vu-fill" id="vu"></div>
+    </div>
+
+    <script>
+        // ==============================================
+        // BUSH'S TRAILBLAZER: Fuzzy Terrain from Nodes
+        // ==============================================
+
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+        const wrap = document.getElementById('canvas-wrap');
+        const overlay = document.getElementById('overlay');
+
+        let W, H, dpr;
+        const GRID = 80;
+        const RENDER = 160;
+
+        // Grids
+        let heatGrid = new Float32Array(GRID * GRID);
+        let renderGrid = new Float32Array(RENDER * RENDER);
+
+        // Data
+        let allTrails = {};
+        let moves = [];
+        let links = {};
+        let nodePos = [];
+        let step = 0;
+        let threshold = 0.1;
+        let isPlaying = false;
+        let playTimer = null;
+        let viewMode = 'contour'; // 'contour' or 'heatmap'
+
+        // STIGMERGIC PHEROMONE TRAILS
+        // Each path between nodes accumulates "pheromone" when walked
+        let pheromoneTrails = {}; // key: "from-to", value: strength (0-1)
+        let walkerLastNodeIdx = -1;
+
+        // TERRAIN EVOLUTION SNAPSHOTS
+        let lastCycleNumber = -1;
+        let playStartTime = 0;
+        const MAX_SNAPSHOTS = 12;
+
+        // Store snapshots with their terrain state for restoration
+        const snapshotStates = [];
+
+        function captureSnapshot(cycleLabel, nodeIdx) {
+            const grid = document.getElementById('snapshot-grid');
+            if (!canvas || grid.children.length >= MAX_SNAPSHOTS) return;
+
+            // Get current node name
+            const nodeName = nodeIdx >= 0 && moves[nodeIdx]
+                ? moves[nodeIdx].text.slice(0, 10)
+                : 'Cycle';
+
+            // Store terrain state for restoration
+            const stateIndex = snapshotStates.length;
+            snapshotStates.push({
+                label: cycleLabel,
+                nodeName: nodeName,
+                step: step,
+                accumulatedTerrain: accumulatedTerrain.slice(),
+                pheromoneTrails: { ...pheromoneTrails }
+            });
+
+            // Create snapshot card
+            const card = document.createElement('div');
+            card.className = 'snapshot-card';
+            card.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                border-radius: 8px;
+                overflow: hidden;
+                border: 1px solid var(--dim);
+                background: #111;
+                cursor: pointer;
+                transition: all 0.2s;
+            `;
+            card.title = `${nodeName} — Click to restore`;
+
+            // Thumbnail canvas
+            const thumb = document.createElement('canvas');
+            thumb.width = 70;
+            thumb.height = 70;
+            const thumbCtx = thumb.getContext('2d');
+            thumbCtx.drawImage(canvas, 0, 0, W * dpr, H * dpr, 0, 0, 70, 70);
+
+            // Label with node name
+            const label = document.createElement('div');
+            label.style.cssText = `
+                font-size: 8px;
+                color: var(--accent);
+                padding: 4px;
+                text-align: center;
+                background: rgba(0,0,0,0.8);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            `;
+            label.textContent = nodeName;
+
+            card.appendChild(thumb);
+            card.appendChild(label);
+
+            // Hover effect
+            card.addEventListener('mouseenter', () => {
+                card.style.borderColor = 'var(--accent)';
+                card.style.transform = 'scale(1.05)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.borderColor = 'var(--dim)';
+                card.style.transform = 'scale(1)';
+            });
+
+            // Click to RESTORE terrain state
+            card.addEventListener('click', () => {
+                const state = snapshotStates[stateIndex];
+                if (state) {
+                    // Restore terrain
+                    accumulatedTerrain.set(state.accumulatedTerrain);
+                    pheromoneTrails = { ...state.pheromoneTrails };
+                    step = state.step;
+                    updateScrubber();
+                    computeHeat();
+
+                    // Highlight selected card
+                    document.querySelectorAll('.snapshot-card').forEach(c => {
+                        c.style.borderColor = 'var(--dim)';
+                    });
+                    card.style.borderColor = 'var(--warm)';
+                }
+            });
+
+            grid.appendChild(card);
+        }
+
+        // Audio
+        let actx, master, verb, wet, dry;
+        let audioReady = false;
+        const SCALES = {
+            minor: [0, 3, 5, 7, 10],
+            major: [0, 4, 7, 9, 11],
+            penta: [0, 2, 4, 7, 9]
+        };
+        let scale = 'minor';
+
+        // --- INIT ---
+        function resize() {
+            const rect = wrap.getBoundingClientRect();
+            W = rect.width;
+            H = rect.height;
+            dpr = Math.min(window.devicePixelRatio, 2);
+            canvas.width = W * dpr;
+            canvas.height = H * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            if (moves.length) computeNodePositions();
+        }
+
+        // === TERRAIN-RESPONSIVE SYNTHESIZER ===
+        let droneOscs = [];
+        let droneGains = [];
+        let droneFilters = [];
+        let lastWalkerNodeIdx = -1;
+
+        async function initAudio() {
+            if (audioReady) return;
+            const AC = window.AudioContext || window.webkitAudioContext;
+            actx = new AC();
+
+            master = actx.createGain();
+            master.gain.value = 0.6;
+
+            verb = actx.createConvolver();
+            const len = actx.sampleRate * 4;
+            const buf = actx.createBuffer(2, len, actx.sampleRate);
+            for (let i = 0; i < len; i++) {
+                const d = Math.pow(1 - i / len, 2.5);
+                buf.getChannelData(0)[i] = (Math.random() * 2 - 1) * d * 0.25;
+                buf.getChannelData(1)[i] = (Math.random() * 2 - 1) * d * 0.25;
+            }
+            verb.buffer = buf;
+
+            wet = actx.createGain();
+            dry = actx.createGain();
+            wet.gain.value = 0.6;
+            dry.gain.value = 0.5;
+
+            master.connect(dry);
+            dry.connect(actx.destination);
+            master.connect(verb);
+            verb.connect(wet);
+            wet.connect(actx.destination);
+
+            // NO DRONE - just melodic tones when visiting nodes
+
+            if (actx.state === 'suspended') await actx.resume();
+            audioReady = true;
+            overlay.classList.add('hidden');
+        }
+
+        // Update synthesizer based on terrain and walker position
+        function updateSynthFromTerrain(walkerX, walkerY, isBacktracking) {
+            if (!audioReady || !actx) return;
+
+            // Sample terrain at walker position
+            const gx = Math.floor(walkerX / W * (GRID - 1));
+            const gy = Math.floor(walkerY / H * (GRID - 1));
+            const terrainVal = heatGrid[Math.max(0, Math.min(gy * GRID + gx, heatGrid.length - 1))] || 0;
+
+            // Overall terrain energy
+            const totalEnergy = heatGrid.reduce((a, b) => a + b, 0) / (GRID * GRID);
+
+            // Modulate filters based on terrain height (higher = brighter)
+            const baseFilterFreq = 150 + terrainVal * 400 + totalEnergy * 200;
+            const backtrackBoost = isBacktracking ? 1.3 : 1;
+
+            for (let i = 0; i < droneFilters.length; i++) {
+                const targetFreq = baseFilterFreq * (1 + i * 0.3) * backtrackBoost;
+                droneFilters[i].frequency.setTargetAtTime(
+                    Math.min(targetFreq, 2000),
+                    actx.currentTime,
+                    0.1
+                );
+            }
+
+            // Modulate gains (higher terrain = slightly louder)
+            const baseGain = 0.015 + totalEnergy * 0.02;
+            for (let i = 0; i < droneGains.length; i++) {
+                droneGains[i].gain.setTargetAtTime(
+                    baseGain * (1 - i * 0.15) * backtrackBoost,
+                    actx.currentTime,
+                    0.15
+                );
+            }
+        }
+
+        function playTone(idx) {
+            if (!audioReady) return;
+            const notes = SCALES[scale];
+            const baseNote = 48;
+            const freq = 261.63 * Math.pow(2, (baseNote + notes[idx % notes.length] - 60) / 12);
+
+            const osc = actx.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.value = freq;
+
+            const g = actx.createGain();
+            g.gain.setValueAtTime(0.4, actx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 1.2);
+
+            osc.connect(g);
+            g.connect(master);
+            osc.start();
+            osc.stop(actx.currentTime + 1.3);
+        }
+
+        function playDrone() {
+            if (!audioReady) return;
+            const baseFreq = 55;
+            for (let i = 0; i < 3; i++) {
+                const osc = actx.createOscillator();
+                osc.type = 'sawtooth';
+                osc.frequency.value = baseFreq * (i + 1);
+
+                const g = actx.createGain();
+                g.gain.value = 0.03;
+
+                const filt = actx.createBiquadFilter();
+                filt.type = 'lowpass';
+                filt.frequency.value = 200 + Math.random() * 100;
+
+                osc.connect(filt);
+                filt.connect(g);
+                g.connect(master);
+                osc.start();
+            }
+        }
+
+        // --- DATA ---
+        async function loadTrails() {
+            try {
+                const [d1, d2] = await Promise.all([
+                    fetch('./data/trail_demos.json').then(r => r.json()),
+                    fetch('./data/test.json').then(r => r.json())
+                ]);
+                allTrails = { ...d1, ...d2 };
+
+                const sel = document.getElementById('trail-sel');
+                Object.keys(allTrails).forEach(k => {
+                    const o = document.createElement('option');
+                    o.value = k;
+                    o.textContent = k;
+                    sel.appendChild(o);
+                });
+
+                const keys = Object.keys(allTrails);
+                if (keys.length) {
+                    sel.value = keys[0];
+                    loadTrail(keys[0]);
+                }
+            } catch (e) {
+                console.error('Load failed', e);
+            }
+        }
+
+        function loadTrail(key) {
+            const d = allTrails[key];
+            moves = Array.isArray(d) ? d : (d.moves || []);
+            step = 0;
+
+            // Reset accumulated terrain for new trail
+            accumulatedTerrain.fill(0);
+
+            // Update trail name display
+            document.getElementById('current-trail').textContent = key.replace(/([A-Z])/g, ' $1').trim();
+
+            computeLinks();
+            computeNodePositions();
+            computeHeat();
+            updateStats();
+            updateScrubber();
+        }
+
+        function jaccard(a, b) {
+            const sA = new Set(a.toLowerCase().split(/\W+/).filter(x => x));
+            const sB = new Set(b.toLowerCase().split(/\W+/).filter(x => x));
+            if (!sA.size || !sB.size) return 0;
+            const inter = [...sA].filter(x => sB.has(x)).length;
+            return inter / (sA.size + sB.size - inter);
+        }
+
+        function computeLinks() {
+            links = {};
+            for (let i = 0; i < moves.length; i++) {
+                links[i] = {};
+                for (let j = 0; j < i; j++) {
+                    links[i][j] = jaccard(moves[i].text, moves[j].text);
+                }
+            }
+        }
+
+        function computeNodePositions() {
+            // CENTERED GRID LAYOUT
+            nodePos = [];
+            const n = moves.length;
+            const cols = Math.ceil(Math.sqrt(n));
+            const rows = Math.ceil(n / cols);
+            const cellW = W / (cols + 1);
+            const cellH = H / (rows + 1);
+            const offsetX = (W - cols * cellW) / 2 + cellW / 2;
+            const offsetY = (H - rows * cellH) / 2 + cellH / 2;
+
+            for (let i = 0; i < n; i++) {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                nodePos.push({
+                    x: offsetX + col * cellW,
+                    y: offsetY + row * cellH,
+                    gx: Math.floor((offsetX + col * cellW) / W * (GRID - 1)),
+                    gy: Math.floor((offsetY + row * cellH) / H * (GRID - 1))
+                });
+            }
+        }
+
+        // --- TERRAIN FROM NODES ---
+        // Accumulated terrain from walker - persists across frames
+        let accumulatedTerrain = new Float32Array(GRID * GRID);
+
+        function computeHeat() {
+            // Start with base heat from nodes
+            heatGrid.fill(0);
+
+            // Each visited node radiates heat based on its link strength
+            for (let i = 0; i < Math.min(step, moves.length); i++) {
+                const pos = nodePos[i];
+                if (!pos) continue;
+
+                // Sum link weights for this node
+                let weight = 0.5; // Base heat
+                for (let j = 0; j < i; j++) {
+                    const sim = links[i]?.[j] || 0;
+                    if (sim >= threshold) weight += sim;
+                }
+
+                // Radiate heat from this node
+                const radius = GRID * 0.25;
+                for (let gy = 0; gy < GRID; gy++) {
+                    for (let gx = 0; gx < GRID; gx++) {
+                        const dx = gx - pos.gx;
+                        const dy = gy - pos.gy;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < radius) {
+                            const falloff = 1 - (dist / radius);
+                            heatGrid[gy * GRID + gx] += weight * falloff * falloff;
+                        }
+                    }
+                }
+            }
+
+            // High links between nodes create "ridges" between them
+            for (let i = 1; i < Math.min(step, moves.length); i++) {
+                for (let j = 0; j < i; j++) {
+                    const sim = links[i]?.[j] || 0;
+                    if (sim < threshold) continue;
+
+                    const p1 = nodePos[i];
+                    const p2 = nodePos[j];
+                    if (!p1 || !p2) continue;
+
+                    // Draw ridge between nodes
+                    const steps = 20;
+                    for (let t = 0; t <= steps; t++) {
+                        const x = p1.gx + (p2.gx - p1.gx) * (t / steps);
+                        const y = p1.gy + (p2.gy - p1.gy) * (t / steps);
+                        const ridgeRadius = GRID * 0.08;
+
+                        for (let dy = -ridgeRadius; dy <= ridgeRadius; dy++) {
+                            for (let dx = -ridgeRadius; dx <= ridgeRadius; dx++) {
+                                const gx = Math.round(x + dx);
+                                const gy = Math.round(y + dy);
+                                if (gx < 0 || gx >= GRID || gy < 0 || gy >= GRID) continue;
+
+                                const dist = Math.sqrt(dx * dx + dy * dy);
+                                if (dist < ridgeRadius) {
+                                    const falloff = 1 - (dist / ridgeRadius);
+                                    heatGrid[gy * GRID + gx] += sim * falloff * 0.3;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ADD accumulated terrain from walker journeys
+            for (let i = 0; i < heatGrid.length; i++) {
+                heatGrid[i] += accumulatedTerrain[i];
+            }
+
+            // Slowly decay accumulated terrain
+            for (let i = 0; i < accumulatedTerrain.length; i++) {
+                accumulatedTerrain[i] *= 0.995;
+            }
+
+            // Upscale to render grid
+            const factor = (GRID - 1) / (RENDER - 1);
+            for (let y = 0; y < RENDER; y++) {
+                for (let x = 0; x < RENDER; x++) {
+                    const lx = x * factor, ly = y * factor;
+                    const x0 = Math.floor(lx), y0 = Math.floor(ly);
+                    const x1 = Math.min(x0 + 1, GRID - 1), y1 = Math.min(y0 + 1, GRID - 1);
+                    const tx = lx - x0, ty = ly - y0;
+
+                    const v00 = heatGrid[y0 * GRID + x0];
+                    const v10 = heatGrid[y0 * GRID + x1];
+                    const v01 = heatGrid[y1 * GRID + x0];
+                    const v11 = heatGrid[y1 * GRID + x1];
+
+                    renderGrid[y * RENDER + x] = (v00 * (1 - tx) + v10 * tx) * (1 - ty) + (v01 * (1 - tx) + v11 * tx) * ty;
+                }
+            }
+        }
+
+        function updateStats() {
+            let activeLinks = 0, totalWeight = 0;
+            for (let i = 1; i < moves.length; i++) {
+                for (let j = 0; j < i; j++) {
+                    const s = links[i]?.[j] || 0;
+                    if (s >= threshold) {
+                        activeLinks++;
+                        totalWeight += s;
+                    }
+                }
+            }
+            document.getElementById('s-links').textContent = activeLinks;
+            document.getElementById('s-density').textContent = moves.length ? (totalWeight / moves.length).toFixed(2) : '0.00';
+            document.getElementById('s-moves').textContent = moves.length;
+        }
+
+        function updateScrubber() {
+            const scrub = document.getElementById('scrub');
+            scrub.max = moves.length;
+            scrub.value = step;
+            document.getElementById('step-label').textContent = `${step} / ${moves.length}`;
+        }
+
+        // --- RENDER ---
+        function draw() {
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, W, H);
+
+            if (viewMode === 'heatmap') {
+                drawHeatmap();
+            } else {
+                drawContours();
+            }
+            drawWanderingPath();
+            drawNodes();
+
+            const energy = heatGrid.reduce((a, b) => a + b, 0) / (GRID * GRID);
+            document.getElementById('vu').style.width = `${Math.min(energy * 30, 100)}%`;
+        }
+
+        function drawContours() {
+            const cellW = W / (RENDER - 1);
+            const cellH = H / (RENDER - 1);
+            const levels = 14;
+
+            for (let l = 1; l <= levels; l++) {
+                const thr = (l / levels) * 2.5;
+                // ACG palette: warm earthy tones transitioning to sage
+                const hue = 35 + (l / levels) * 25; // Orange-tan to greenish
+                const sat = 40 + (l / levels) * 20;
+                const alpha = 0.12 + (l / levels) * 0.45;
+                ctx.strokeStyle = `hsla(${hue}, ${sat}%, 50%, ${alpha})`;
+                ctx.lineWidth = 0.7 + (l / levels) * 1;
+
+                ctx.beginPath();
+                for (let y = 0; y < RENDER - 1; y++) {
+                    for (let x = 0; x < RENDER - 1; x++) {
+                        const v0 = renderGrid[y * RENDER + x];
+                        const v1 = renderGrid[y * RENDER + x + 1];
+                        const v2 = renderGrid[(y + 1) * RENDER + x + 1];
+                        const v3 = renderGrid[(y + 1) * RENDER + x];
+
+                        const bin = (v0 > thr ? 8 : 0) | (v1 > thr ? 4 : 0) | (v2 > thr ? 2 : 0) | (v3 > thr ? 1 : 0);
+                        if (bin === 0 || bin === 15) continue;
+
+                        const lerp = (a, b, t) => t === 0 ? a : a + t * (b - a);
+                        const safe = (v1, v2) => v2 === v1 ? 0.5 : (thr - v1) / (v2 - v1);
+
+                        const a = { x: lerp(x, x + 1, safe(v0, v1)), y };
+                        const b = { x: x + 1, y: lerp(y, y + 1, safe(v1, v2)) };
+                        const c = { x: lerp(x, x + 1, safe(v3, v2)), y: y + 1 };
+                        const d = { x, y: lerp(y, y + 1, safe(v0, v3)) };
+
+                        const sx = p => p.x * cellW;
+                        const sy = p => p.y * cellH;
+
+                        switch (bin) {
+                            case 1: case 14: ctx.moveTo(sx(c), sy(c)); ctx.lineTo(sx(d), sy(d)); break;
+                            case 2: case 13: ctx.moveTo(sx(b), sy(b)); ctx.lineTo(sx(c), sy(c)); break;
+                            case 3: case 12: ctx.moveTo(sx(b), sy(b)); ctx.lineTo(sx(d), sy(d)); break;
+                            case 4: case 11: ctx.moveTo(sx(a), sy(a)); ctx.lineTo(sx(b), sy(b)); break;
+                            case 5: ctx.moveTo(sx(a), sy(a)); ctx.lineTo(sx(d), sy(d)); ctx.moveTo(sx(b), sy(b)); ctx.lineTo(sx(c), sy(c)); break;
+                            case 6: case 9: ctx.moveTo(sx(a), sy(a)); ctx.lineTo(sx(c), sy(c)); break;
+                            case 7: case 8: ctx.moveTo(sx(a), sy(a)); ctx.lineTo(sx(d), sy(d)); break;
+                            case 10: ctx.moveTo(sx(a), sy(a)); ctx.lineTo(sx(b), sy(b)); ctx.moveTo(sx(c), sy(c)); ctx.lineTo(sx(d), sy(d)); break;
+                        }
+                    }
+                }
+                ctx.stroke();
+            }
+        }
+
+        function drawHeatmap() {
+            const cellW = W / RENDER;
+            const cellH = H / RENDER;
+
+            for (let y = 0; y < RENDER; y++) {
+                for (let x = 0; x < RENDER; x++) {
+                    const val = renderGrid[y * RENDER + x];
+                    if (val < 0.01) continue;
+
+                    // Fuzzy warm color gradient
+                    const intensity = Math.min(val / 2, 1);
+                    const hue = 180 - intensity * 60; // Cyan to yellow-green
+                    const sat = 60 + intensity * 30;
+                    const light = 30 + intensity * 35;
+                    const alpha = 0.3 + intensity * 0.5;
+
+                    ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
+                    ctx.fillRect(x * cellW, y * cellH, cellW + 1, cellH + 1);
+                }
+            }
+
+            // Add glow points at node positions
+            for (let i = 0; i < Math.min(step, nodePos.length); i++) {
+                const p = nodePos[i];
+                const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 40);
+                gradient.addColorStop(0, 'rgba(255, 220, 150, 0.5)');
+                gradient.addColorStop(0.5, 'rgba(255, 180, 100, 0.2)');
+                gradient.addColorStop(1, 'rgba(255, 150, 80, 0)');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(p.x - 40, p.y - 40, 80, 80);
+            }
+        }
+
+        function drawWanderingPath() {
+            if (step < 1 || nodePos.length === 0) return;
+
+            const time = Date.now() / 1000;
+
+            // === DECAY ALL PHEROMONE TRAILS ===
+            for (const key in pheromoneTrails) {
+                pheromoneTrails[key] *= 0.998; // Slow decay
+                if (pheromoneTrails[key] < 0.01) delete pheromoneTrails[key];
+            }
+
+            // === DRAW PHEROMONE TRAILS (stigmergic accumulation) ===
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            for (let i = 1; i < Math.min(step, moves.length); i++) {
+                for (let j = 0; j < i; j++) {
+                    const sim = links[i]?.[j] || 0;
+                    if (sim < threshold) continue;
+
+                    const p1 = nodePos[i];
+                    const p2 = nodePos[j];
+                    if (!p1 || !p2) continue;
+
+                    // Get pheromone level for this path
+                    const pathKey = `${Math.min(i, j)}-${Math.max(i, j)}`;
+                    const pheromone = pheromoneTrails[pathKey] || 0;
+                    const totalStrength = sim + pheromone * 0.5;
+
+                    // Generate curved walking path
+                    const walkPath = [];
+                    const segments = 12;
+
+                    for (let s = 0; s <= segments; s++) {
+                        const t = s / segments;
+                        let x = p1.x + (p2.x - p1.x) * t;
+                        let y = p1.y + (p2.y - p1.y) * t;
+
+                        // Organic wobble
+                        const wx = Math.sin(t * Math.PI * 3 + i + j) * 8;
+                        const wy = Math.cos(t * Math.PI * 2 + i * 0.7) * 6;
+                        walkPath.push({ x: x + wx, y: y + wy });
+                    }
+
+                    // Draw path with pheromone-based intensity
+                    const isBacktrack = Math.abs(i - j) > 1;
+                    const baseAlpha = isBacktrack ? 0.15 : 0.25;
+                    const pheromoneBoost = Math.min(pheromone * 0.6, 0.5);
+                    const alpha = baseAlpha + sim * 0.3 + pheromoneBoost;
+
+                    // Color: more pheromone = warmer/brighter
+                    const hue = isBacktrack ? 30 + pheromone * 20 : 170 - pheromone * 40;
+                    const sat = 60 + pheromone * 30;
+                    const light = 50 + pheromone * 20;
+
+                    ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
+                    ctx.lineWidth = 1.5 + totalStrength * 3 + pheromone * 2;
+                    ctx.setLineDash(isBacktrack ? [4, 6] : []);
+
+                    // Draw the trail
+                    ctx.beginPath();
+                    ctx.moveTo(walkPath[0].x, walkPath[0].y);
+                    for (let k = 1; k < walkPath.length; k++) {
+                        if (k < walkPath.length - 1) {
+                            const xc = (walkPath[k].x + walkPath[k + 1].x) / 2;
+                            const yc = (walkPath[k].y + walkPath[k + 1].y) / 2;
+                            ctx.quadraticCurveTo(walkPath[k].x, walkPath[k].y, xc, yc);
+                        } else {
+                            ctx.lineTo(walkPath[k].x, walkPath[k].y);
+                        }
+                    }
+                    ctx.stroke();
+
+                    // Draw "ant footprints" along high-pheromone paths
+                    if (pheromone > 0.3) {
+                        ctx.setLineDash([]);
+                        ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${pheromone * 0.5})`;
+                        for (let k = 0; k < walkPath.length; k += 2) {
+                            ctx.beginPath();
+                            ctx.arc(walkPath[k].x, walkPath[k].y, 1.5 + pheromone, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+                }
+            }
+            ctx.setLineDash([]);
+
+            // === STIGMERGIC WALKER (deposits pheromone as it moves) ===
+            if (step > 0 && nodePos.length > 0) {
+                const cycleTime = 25; // Slow contemplative pace
+
+                // Use relative time from when playback started
+                const relativeTime = (Date.now() / 1000) - playStartTime;
+                const walkerProgress = (relativeTime / cycleTime) % 1;
+                const currentCycle = Math.floor(relativeTime / cycleTime);
+
+                // FIRST ROUND: Capture at each node visit to show terrain building
+                // AFTER FIRST ROUND: Capture only at cycle completion
+                if (isPlaying && currentCycle >= 0) {
+                    if (currentCycle === 0) {
+                        // First round: capture when walker reaches new node
+                        const journeyIdx = Math.floor(walkerProgress * step);
+                        if (journeyIdx > lastCycleNumber && journeyIdx < step) {
+                            lastCycleNumber = journeyIdx;
+                            captureSnapshot(`1.${journeyIdx + 1}`, journeyIdx);
+                        }
+                    } else if (currentCycle > Math.max(0, lastCycleNumber)) {
+                        // After first round: capture at cycle completion
+                        lastCycleNumber = currentCycle;
+                        captureSnapshot(`Cycle ${currentCycle + 1}`, step - 1);
+                    }
+                }
+
+                // Build journey including backtrack visits
+                const journeyNodes = [];
+                for (let i = 0; i < Math.min(step, nodePos.length); i++) {
+                    journeyNodes.push({ idx: i, isBacktrack: false });
+
+                    // Add backtrack visits for strong links
+                    for (let j = 0; j < i - 1; j++) {
+                        const sim = links[i]?.[j] || 0;
+                        if (sim >= threshold) {
+                            journeyNodes.push({ idx: j, isBacktrack: true });
+                            journeyNodes.push({ idx: i, isBacktrack: true }); // Return
+                        }
+                    }
+                }
+
+                if (journeyNodes.length > 0) {
+                    // Current position in journey
+                    const journeyIdx = Math.floor(walkerProgress * (journeyNodes.length - 1));
+                    const currentNode = journeyNodes[Math.min(journeyIdx, journeyNodes.length - 1)];
+                    const nextNode = journeyNodes[Math.min(journeyIdx + 1, journeyNodes.length - 1)];
+
+                    // TRIGGER SOUND when arriving at a new node
+                    if (currentNode.idx !== lastWalkerNodeIdx) {
+                        playTone(currentNode.idx);
+                        lastWalkerNodeIdx = currentNode.idx;
+                    }
+
+                    const subProgress = (walkerProgress * (journeyNodes.length - 1)) % 1;
+
+                    const fromPos = nodePos[currentNode.idx];
+                    const toPos = nodePos[nextNode.idx];
+
+                    if (fromPos && toPos) {
+                        // Interpolate walker position
+                        const walkerX = fromPos.x + (toPos.x - fromPos.x) * subProgress;
+                        const walkerY = fromPos.y + (toPos.y - fromPos.y) * subProgress;
+
+                        // DEPOSIT PHEROMONE on the path being walked
+                        const pathKey = `${Math.min(currentNode.idx, nextNode.idx)}-${Math.max(currentNode.idx, nextNode.idx)}`;
+                        pheromoneTrails[pathKey] = Math.min((pheromoneTrails[pathKey] || 0) + 0.015, 1.5);
+
+                        // === BUILD TERRAIN RIDGES ALONG WALKED PATH ===
+                        // Walking creates lasting ridges in the landscape
+                        const gx = Math.floor(walkerX / W * (GRID - 1));
+                        const gy = Math.floor(walkerY / H * (GRID - 1));
+                        const gridIdx = gy * GRID + gx;
+
+                        if (gridIdx >= 0 && gridIdx < accumulatedTerrain.length) {
+                            // ALWAYS build up terrain where we walk
+                            accumulatedTerrain[gridIdx] += 0.03;
+
+                            // Spread ridge to neighbors (creates wider paths)
+                            const neighbors = [
+                                gridIdx - 1, gridIdx + 1,
+                                gridIdx - GRID, gridIdx + GRID
+                            ];
+                            for (const n of neighbors) {
+                                if (n >= 0 && n < accumulatedTerrain.length) {
+                                    accumulatedTerrain[n] += 0.01;
+                                }
+                            }
+                        }
+
+                        // === UPDATE SYNTH FROM TERRAIN ===
+                        const isBacktracking = currentNode.isBacktrack;
+                        updateSynthFromTerrain(walkerX, walkerY, isBacktracking);
+
+                        // Walker glow with breathing
+                        const breathe = Math.sin(time * 0.8) * 0.3 + 0.7;
+
+                        ctx.shadowBlur = 25 * breathe;
+                        ctx.shadowColor = isBacktracking
+                            ? 'rgba(255, 160, 80, 0.95)'
+                            : 'rgba(255, 220, 120, 0.95)';
+                        ctx.fillStyle = isBacktracking
+                            ? `rgba(255, 180, 100, ${0.95 * breathe})`
+                            : `rgba(255, 235, 150, ${0.95 * breathe})`;
+
+                        // Main walker
+                        ctx.beginPath();
+                        ctx.arc(walkerX, walkerY, 6 + breathe * 2, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+
+                        // Pheromone deposit indicator (small burst behind walker)
+                        for (let d = 1; d <= 6; d++) {
+                            const depositX = walkerX - (toPos.x - fromPos.x) * d * 0.08;
+                            const depositY = walkerY - (toPos.y - fromPos.y) * d * 0.08;
+                            const depositAlpha = (0.4 - d * 0.06) * breathe;
+
+                            ctx.fillStyle = isBacktracking
+                                ? `rgba(255, 150, 80, ${depositAlpha})`
+                                : `rgba(255, 220, 120, ${depositAlpha})`;
+                            ctx.beginPath();
+                            ctx.arc(depositX, depositY, 4 - d * 0.4, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+                }
+            }
+        }
+
+
+        function drawNodes() {
+            for (let i = 0; i < nodePos.length; i++) {
+                const p = nodePos[i];
+                const visited = i < step;
+                const current = i === step - 1;
+
+                // Glow for visited - ACG warm palette
+                if (visited) {
+                    ctx.shadowBlur = current ? 25 : 12;
+                    ctx.shadowColor = current ? 'rgba(212, 149, 106, 0.95)' : 'rgba(196, 167, 125, 0.7)';
+                } else {
+                    ctx.shadowBlur = 0;
+                }
+
+                const r = current ? 11 : (visited ? 7 : 5);
+
+                // ACG color scheme: warm tans for visited, sage hints
+                ctx.fillStyle = visited
+                    ? (current ? '#d4956a' : '#c4a77d')
+                    : '#2a2a2a';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Add subtle ring for current
+                if (current) {
+                    ctx.strokeStyle = 'rgba(143, 184, 160, 0.6)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, r + 4, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                ctx.shadowBlur = 0;
+
+                // Label - improved readability
+                if (visited) {
+                    ctx.fillStyle = current ? 'rgba(255, 255, 255, 0.95)' : 'rgba(180, 180, 180, 0.85)';
+                    ctx.font = current ? 'bold 10px Inter, sans-serif' : '9px Inter, sans-serif';
+                    ctx.textAlign = 'center';
+                    const label = moves[i].text.slice(0, 12) + (moves[i].text.length > 12 ? '…' : '');
+                    ctx.fillText(label, p.x, p.y + r + 14);
+                }
+            }
+        }
+
+        function loop() {
+            computeHeat();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // --- INTERACTION ---
+        function handleClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Check if clicked on a node
+            for (let i = 0; i < nodePos.length; i++) {
+                const p = nodePos[i];
+                const dx = x - p.x;
+                const dy = y - p.y;
+                if (Math.sqrt(dx * dx + dy * dy) < 15) {
+                    step = i + 1;
+                    playTone(i);
+                    updateScrubber();
+
+                    // Count related links
+                    let linkCount = 0;
+                    for (let j = 0; j < moves.length; j++) {
+                        if (j === i) continue;
+                        const sim = links[Math.max(i, j)]?.[Math.min(i, j)] || 0;
+                        if (sim >= threshold) linkCount++;
+                    }
+
+                    // Update header node info (minimal zen)
+                    const headerInfo = document.getElementById('node-info-header');
+                    document.getElementById('node-header-name').textContent = moves[i].text;
+                    document.getElementById('node-header-links').textContent = `${linkCount} links`;
+                    headerInfo.style.display = 'block';
+
+                    // Show download button
+                    document.getElementById('download-all-btn').style.display = 'block';
+
+                    return;
+                }
+            }
+        }
+
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            document.getElementById('btn-play').textContent = isPlaying ? '⏸ Pause' : '▶ Play';
+            document.getElementById('btn-play').classList.toggle('active', isPlaying);
+
+            if (isPlaying) {
+                // Reset snapshot tracking for new playback
+                playStartTime = Date.now() / 1000;
+                lastCycleNumber = -1;
+                snapshotStates.length = 0;
+                document.getElementById('snapshot-grid').innerHTML = '';
+
+                playTimer = setInterval(() => {
+                    if (step < moves.length) {
+                        step++;
+                        playTone(step - 1);
+                        updateScrubber();
+                    } else {
+                        togglePlay();
+                    }
+                }, 700);
+            } else {
+                clearInterval(playTimer);
+            }
+        }
+
+        // --- SETUP ---
+        document.getElementById('trail-sel').addEventListener('change', e => loadTrail(e.target.value));
+        document.getElementById('harmony-sel').addEventListener('change', e => { scale = e.target.value; });
+        document.getElementById('view-mode').addEventListener('change', e => { viewMode = e.target.value; });
+        document.getElementById('threshold').addEventListener('input', e => {
+            threshold = parseFloat(e.target.value);
+            updateStats();
+        });
+        document.getElementById('scrub').addEventListener('input', e => {
+            const newStep = parseInt(e.target.value);
+            if (newStep > step) {
+                for (let i = step; i < newStep; i++) playTone(i);
+            }
+            step = newStep;
+            updateScrubber();
+        });
+        document.getElementById('btn-play').addEventListener('click', togglePlay);
+        canvas.addEventListener('click', handleClick);
+        overlay.addEventListener('click', async () => {
+            await initAudio();
+            playDrone();
+        });
+
+        // Download button saves current terrain
+        document.getElementById('download-all-btn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = `atg-terrain-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+
+        window.addEventListener('resize', resize);
+        window.addEventListener('load', () => {
+            resize();
+            loadTrails();
+            requestAnimationFrame(loop);
+        });
+    </script>
+</body>
+
+</html>

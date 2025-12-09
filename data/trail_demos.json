@@ -1,0 +1,87 @@
+{
+    "StreamerWorkflow": [
+        {
+            "text": "Start stream intro"
+        },
+        {
+            "text": "Play game match 1"
+        },
+        {
+            "text": "Commentate on gameplay"
+        },
+        {
+            "text": "Check OBS bitrate"
+        },
+        {
+            "text": "Read chat message"
+        },
+        {
+            "text": "Reply to viewer"
+        },
+        {
+            "text": "Play game match 1"
+        },
+        {
+            "text": "Monitor analytics"
+        },
+        {
+            "text": "Troubleshoot audio lag"
+        },
+        {
+            "text": "Play game match 2"
+        },
+        {
+            "text": "Thank new subscriber"
+        },
+        {
+            "text": "Performance for audience"
+        },
+        {
+            "text": "Adjust camera lighting"
+        },
+        {
+            "text": "End stream outgoing"
+        }
+    ],
+    "PaperWritingProcess": [
+        {
+            "text": "Draft abstract"
+        },
+        {
+            "text": "Review related work"
+        },
+        {
+            "text": "Cite Goldschmidt linkography"
+        },
+        {
+            "text": "Define Creator Trail"
+        },
+        {
+            "text": "Draft introduction"
+        },
+        {
+            "text": "Revise abstract"
+        },
+        {
+            "text": "Write Research Gap section"
+        },
+        {
+            "text": "Cite Shneiderman CSTs"
+        },
+        {
+            "text": "Refine Creator Trail definition"
+        },
+        {
+            "text": "Write Methodology"
+        },
+        {
+            "text": "Propose Trail-Aware Tools"
+        },
+        {
+            "text": "Edit Introduction"
+        },
+        {
+            "text": "Finalize Conclusion"
+        }
+    ]
+}

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Think Tool: Trail-Aware Workbench</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <!-- Chart.js for histograms if needed, but we'll stick to SVG/Canvas for now for speed -->
+    <style>
+        :root {
+            --bg-color: #f4f4f4;
+            --panel-bg: #ffffff;
+            --text-color: #333;
+            --accent-color: #007bff;
+            --highlight-color: #e8f0fe;
+            --border-color: #e0e0e0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        header h1 {
+            font-size: 1.2rem;
+            margin: 0;
+            font-weight: 500;
+        }
+
+        header .tagline {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        #app-root {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            padding: 10px 15px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 0.9rem;
+            background: #fafafa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+        }
+
+        /* Editor Panel (Left) */
+        .editor-panel {
+            width: 25%;
+            min-width: 300px;
+        }
+
+        .editor-content {
+            flex: 1;
+            position: relative;
+        }
+
+        textarea#trail-editor {
+            width: 100%;
+            height: 100%;
+            border: none;
+            padding: 15px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            background: #fdfdfd;
+        }
+
+        textarea#trail-editor:focus {
+            background: #fff;
+        }
+
+        /* Visualization Panel (Center) */
+        .viz-panel {
+            flex: 1;
+            min-width: 400px;
+            overflow-y: auto;
+        }
+
+        .viz-content {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .graph-container {
+            width: 100%;
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Inspector Panel (Right) */
+        .inspector-panel {
+            width: 25%;
+            min-width: 300px;
+            border-left: 1px solid var(--border-color);
+            border-right: none;
+        }
+
+        .inspector-scroll {
+            padding: 15px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        /* Matrix View */
+        .matrix-grid {
+            display: grid;
+            gap: 1px;
+            background: #eee;
+            /* grid line color */
+            margin-top: 10px;
+            width: 100%;
+            aspect-ratio: 1;
+        }
+
+        .matrix-cell {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .matrix-cell:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: black;
+            color: white;
+            font-size: 10px;
+            padding: 2px 4px;
+            border-radius: 2px;
+            white-space: nowrap;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* Controls */
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 0.8rem;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .value-display {
+            float: right;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        /* Metrics */
+        .metric-card {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #eee;
+        }
+
+        .metric-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: #7f8c8d;
+        }
+
+        /* Loading Overlay */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: #555;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loading">
+        <div class="spinner"></div>
+        <div>Loading AI Models...</div>
+    </div>
+
+    <header>
+        <h1>Fuzzy Linkography Workbench</h1>
+        <div class="tagline">Media for Thinking the Unthinkable</div>
+    </header>
+
+    <div id="app-root">
+        <!-- React will render here -->
+    </div>
+
+    <script type="module" src="./think_tool.js"></script>
+
+</body>
+
+</html>
